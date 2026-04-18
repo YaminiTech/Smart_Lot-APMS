@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMART LOT | AI Live Stream</title>
+    <link rel="stylesheet" href="/css/global.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        .viewer-layout {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: #000;
+        }
+
+        .stream-container {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .live-feed {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .stream-hud {
+            position: absolute;
+            bottom: 40px;
+            left: 40px;
+            right: 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            pointer-events: none;
+        }
+
+        .hud-card {
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(12px);
+            padding: 1.5rem;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            pointer-events: auto;
+        }
+
+        .badge-live {
+            background: var(--neon-red);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            font-weight: 800;
+            margin-bottom: 0.5rem;
+            display: inline-block;
+            animation: pulse-glow 2s infinite;
+        }
+    </style>
+</head>
+
+<body class="viewer-layout">
+    <header
+        style="padding: 1rem 2rem; background: var(--bg-card); border-bottom: 1px solid var(--border-muted); display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-weight: 900;" class="neon-text-blue">LIVE AI BROADCAST</div>
+        <a href="/" class="btn-cyber btn-secondary" style="font-size: 0.7rem; padding: 6px 15px;">Close Feed</a>
+    </header>
+
+    <div class="stream-container">
+        <img src="/ai_feed" class="live-feed">
+
+        <div class="stream-hud">
+            <div class="hud-card" style="width: 300px;">
+                <div class="badge-live">LIVE DETECTION</div>
+                <h3 id="current-file">--</h3>
+                <p style="font-size: 0.8rem; color: var(--text-secondary);">Filtering performance: 22ms</p>
+                <div
+                    style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); display: flex; gap: 20px;">
+                    <div>
+                        <div style="font-size: 0.6rem; color: var(--text-dim);">AVAIL</div>
+                        <div id="stat-free" style="font-weight: 800; color: var(--neon-green);">--</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.6rem; color: var(--text-dim);">OCCUP</div>
+                        <div id="stat-busy" style="font-weight: 800; color: var(--neon-red);">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="hud-card" style="font-size: 0.75rem; color: var(--text-dim);">
+                <b>VIRTUAL OVERLAY ACTIVE</b><br>
+                Render Resolution: 1280x720<br>
+                Frame Sync: Synchronous
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/core.js"></script>
+    <script>
+        async function instantUpdate() {
+            const data = await API.fetchSpots();
+            updateUI(data);
+        }
+        instantUpdate();
+
+        runHeartbeat(updateUI);
+
+        function updateUI(data) {
+            const spots = data.spots || [];
+            const free = spots.filter(s => !s.occupied).length;
+            document.getElementById('current-file').innerText = data.active || "STDBY";
+            document.getElementById('stat-free').innerText = free;
+            document.getElementById('stat-busy').innerText = spots.length - free;
+        }
+    </script>
+</body>
+
+</html>

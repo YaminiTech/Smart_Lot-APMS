@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Lote Vision | Navigation</title>
+    <link rel="stylesheet" href="css/global.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background: var(--bg-deep);
+            color: var(--text-primary);
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ─── DESKTOP (landscape, sidebar layout) ─── */
+        .driver-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            display: flex;
+            flex-direction: row;
+            gap: 2rem;
+            height: calc(100vh - 40px);
+            align-items: stretch;
+        }
+
+        .hud-side {
+            width: 380px;
+            flex-shrink: 0;
+            background: var(--bg-card);
+            padding: 2.5rem;
+            border-radius: 28px;
+            border: 1px solid var(--border-muted);
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--shadow-card);
+        }
+
+        .blueprint-card {
+            background: #020617;
+            border-radius: 28px;
+            border: 1px solid var(--border-muted);
+            flex-grow: 1;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            cursor: crosshair;
+        }
+
+        .avail-count {
+            font-size: 4.5rem;
+            font-weight: 900;
+            color: var(--neon-blue);
+            line-height: 1;
+            margin: 0.5rem 0;
+            text-shadow: 0 0 20px rgba(0, 243, 255, 0.3);
+        }
+
+        .recommendation-panel {
+            background: var(--bg-deep);
+            padding: 1.5rem;
+            border-radius: 20px;
+            border: 1px solid var(--accent-blue);
+            margin-top: auto;
+            text-align: left;
+            position: relative;
+        }
+
+        .btn-end {
+            background: var(--neon-red);
+            margin-top: 10px;
+        }
+
+        /* ─── MOBILE PORTRAIT (stacked vertical layout) ─── */
+        @media (max-width: 768px) {
+            body {
+                height: 100dvh;
+                overflow: hidden;
+            }
+
+            .driver-container {
+                flex-direction: column;
+                padding: 0;
+                gap: 0;
+                height: 100dvh;
+                max-width: 100%;
+                margin: 0;
+            }
+
+            /* Top info panel — compact, fixed height */
+            .hud-side {
+                width: 100%;
+                flex-shrink: 0;
+                border-radius: 0;
+                border: none;
+                border-bottom: 1px solid var(--border-muted);
+                padding: 14px 18px !important;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                box-shadow: none;
+            }
+
+            /* Compact availability row */
+            .hud-top-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+            }
+
+            .avail-count {
+                font-size: 2.4rem;
+                margin: 0;
+            }
+
+            #status-string {
+                font-size: 0.65rem !important;
+                letter-spacing: 1.5px !important;
+            }
+
+            /* Compact spot panel */
+            .recommendation-panel {
+                margin-top: 0;
+                padding: 10px 14px;
+                border-radius: 14px;
+            }
+
+            #rec-id {
+                font-size: 1.2rem !important;
+                margin: 4px 0 !important;
+            }
+
+            #rec-reason {
+                font-size: 0.72rem !important;
+                margin: 0 !important;
+            }
+
+            /* Nav buttons inline */
+            #nav-controls {
+                margin-top: 0 !important;
+                display: flex;
+                gap: 10px;
+            }
+
+            #nav-controls button {
+                flex: 1;
+                height: 44px !important;
+                font-size: 0.82rem !important;
+                border-radius: 12px !important;
+            }
+
+            /* Map fills all remaining space */
+            .blueprint-card {
+                flex-grow: 1;
+                border-radius: 0;
+                border: none;
+                min-height: 0;
+            }
+
+            /* Hide back link on mobile to save space */
+            .mobile-hide {
+                display: none !important;
+            }
+
+            /* Header row: ← Back | TOTAL AVAILABILITY label | spacer */
+            .mobile-header-row {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 2px;
+            }
+
+            .mobile-back-btn {
+                text-decoration: none;
+                color: var(--text-dim);
+                font-size: 0.75rem;
+                font-weight: 700;
+                letter-spacing: 1px;
+                background: var(--bg-deep);
+                border: 1px solid var(--border-muted);
+                border-radius: 20px;
+                padding: 5px 12px;
+                white-space: nowrap;
+            }
+        }
+
+        /* Desktop: hide the mobile header row */
+        @media (min-width: 769px) {
+            .mobile-header-row {
+                display: none !important;
+            }
+        }
+
+        .pop-up {
+            position: fixed;
+            top: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--neon-red);
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 12px;
+            font-weight: 700;
+            box-shadow: 0 10px 30px rgba(255, 49, 49, 0.4);
+            display: none;
+            z-index: 1000;
+            animation: slide-up 0.3s ease;
+        }
+
+        @keyframes slide-up {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="occupied-alert" class="pop-up">⚠️ SPACE OCCUPIED! REROUTING...</div>
+
+    <!-- Back button: always visible, top-left corner -->
+
+    <div class="driver-container">
+        <!-- 1. DRIVER HUD -->
+        <aside class="hud-side">
+            <a href="index.html" class="mobile-hide"
+                style="text-decoration: none; color: var(--text-dim); font-size: 0.75rem; font-weight: 700; margin-bottom: 2rem; display: block; letter-spacing: 1px;">←
+                EXIT NAVIGATION</a>
+
+            <!-- Mobile: header row with back btn + title -->
+            <div class="mobile-header-row">
+                <a href="index.html" class="mobile-back-btn">← Back</a>
+                <span class="nav-label" style="flex:1; text-align:center;">TOTAL AVAILABILITY</span>
+                <span style="width:60px;"></span><!-- balance spacer -->
+            </div>
+
+
+            <!-- Availability + status row (compact on mobile) -->
+            <div class="hud-top-row">
+                <div style="text-align: center; width: 100%;">
+                    <div class="avail-count" id="avail-hero">--</div>
+                    <p id="status-string"
+                        style="font-weight: 800; color: var(--neon-green); text-transform: uppercase; letter-spacing: 2px; font-size: 0.8rem; margin: 0;">
+                        Ready for Departure</p>
+                </div>
+            </div>
+
+            <!-- Spot targeting + nav controls -->
+            <div id="rec-panel" class="recommendation-panel">
+                <span id="nav-badge" class="nav-label" style="color: var(--neon-blue);">TARGETING NEAREST</span>
+                <h4 id="rec-id" style="font-size: 1.8rem; margin: 10px 0; font-weight: 900;">Searching...</h4>
+                <p id="rec-reason" style="font-size: 0.8rem; color: var(--text-secondary);">Calculating shortest path to
+                    entrance</p>
+
+                <div id="nav-controls" style="margin-top: 20px;">
+                    <button class="btn-cyber" id="start-nav" onclick="requestNavigation()"
+                        style="width: 100%; height: 60px; font-weight: 900; font-size: 1rem;">
+                        🚀 START GUIDANCE
+                    </button>
+                    <button class="btn-cyber btn-end" id="end-nav" onclick="stopNavigation()"
+                        style="width: 100%; height: 60px; font-weight: 900; font-size: 1rem; display: none;">
+                        🏁 END ROUTING
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 2. NAVIGATION BOARD (fills remaining space) -->
+        <main class="blueprint-card">
+            <canvas id="nav-canvas"></canvas>
+        </main>
+    </div>
+
+    <script src="js/core.js"></script>
+    <script>
+        const canvas = document.getElementById('nav-canvas');
+        const ctx = canvas.getContext('2d');
+        const alertBox = document.getElementById('occupied-alert');
+
+        let currentSpots = [];
+        let mapping = null;
+        let recommendedId = null;
+        let navRoute = null;
+        let navProgress = 0;
+        let lotScale = 1;
+        let offset = { x: 0, y: 0 };
+        let isGuidanceActive = false;
+
+        function initCanvas() {
+            const rect = canvas.parentNode.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            drawBlueprint();
+        }
+        window.onresize = initCanvas;
+        initCanvas();
+
+        async function boot() {
+            const data = await API.fetchSpots();
+            updateUI(data);
+        }
+        boot();
+        runHeartbeat(updateUI);
+
+        async function updateUI(data) {
+            currentSpots = data.spots || [];
+            mapping = data.mapping;
+
+            const available = currentSpots.filter(s => !s.occupied);
+            document.getElementById('avail-hero').innerText = available.length;
+
+            if (available.length > 0) {
+                if (isGuidanceActive && recommendedId) {
+                    const spot = currentSpots.find(s => s.spot_id === recommendedId);
+                    if (spot && spot.occupied) {
+                        showOccupiedAlert();
+                        await triggerRec(); // Find new nearest
+                    }
+                } else if (!recommendedId) {
+                    await triggerRec();
+                }
+            }
+
+            drawBlueprint();
+        }
+
+        async function triggerRec() {
+            const rec = await API.fetchRecommendation();
+            if (rec.status === 'success') {
+                recommendedId = rec.recommended_spot;
+                updateRecPanel(rec.recommended_spot, "Proximity optimized to main entrance");
+                if (isGuidanceActive) {
+                    navRoute = findShortestPath(0, recommendedId - 1);
+                }
+            }
+        }
+
+        function updateRecPanel(id, reason) {
+            document.getElementById('rec-id').innerText = `Spot ${id}`;
+            document.getElementById('rec-reason').innerText = reason;
+        }
+
+        canvas.onclick = (e) => {
+            if (!mapping || !mapping.spots) return;
+            const rect = canvas.getBoundingClientRect();
+            const clickX = (e.clientX - rect.left - offset.x) / lotScale;
+            const clickY = (e.clientY - rect.top - offset.y) / lotScale;
+
+            mapping.spots.forEach((poly, idx) => {
+                if (isInside([clickX, clickY], poly)) {
+                    const spotId = idx + 1;
+                    const status = currentSpots.find(s => s.spot_id === spotId);
+
+                    if (status && status.occupied) {
+                        showOccupiedAlert();
+                    } else {
+                        recommendedId = spotId;
+                        if (isGuidanceActive) {
+                            navRoute = findShortestPath(0, recommendedId - 1);
+                        }
+                        updateRecPanel(spotId, "Manual override priority");
+                    }
+                }
+            });
+            drawBlueprint();
+        };
+
+        function isInside(point, vs) {
+            let x = point[0], y = point[1];
+            let inside = false;
+            for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+                let xi = vs[i][0], yi = vs[i][1];
+                let xj = vs[j][0], yj = vs[j][1];
+                let intersect = ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        }
+
+        function showOccupiedAlert() {
+            alertBox.style.display = 'block';
+            setTimeout(() => alertBox.style.display = 'none', 3000);
+        }
+
+        function findShortestPath(startNodeIdx, targetSpotIdx) {
+            if (!mapping || !mapping.nodes || !mapping.edges) return null;
+            let targetNodeIdx = (mapping.spot_node_links) ? mapping.spot_node_links[targetSpotIdx] : 0;
+
+            const n = mapping.nodes.length;
+            const dists = new Array(n).fill(Infinity);
+            const prev = new Array(n).fill(null);
+            dists[startNodeIdx] = 0;
+            const queue = [startNodeIdx];
+
+            while (queue.length > 0) {
+                const u = queue.shift();
+                if (u === targetNodeIdx) break;
+                const neighbors = mapping.edges.filter(e => e[0] === u || e[1] === u).map(e => (e[0] === u ? e[1] : e[0]));
+                for (const v of neighbors) {
+                    const weight = Math.hypot(mapping.nodes[u][0] - mapping.nodes[v][0], mapping.nodes[u][1] - mapping.nodes[v][1]);
+                    if (dists[u] + weight < dists[v]) { dists[v] = dists[u] + weight; prev[v] = u; queue.push(v); }
+                }
+            }
+            const path = [];
+            let curr = targetNodeIdx;
+            while (curr !== null) { path.push(curr); curr = prev[curr]; }
+            return path.length > 1 ? path.reverse() : null;
+        }
+
+        function drawBlueprint() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (!mapping) return;
+
+            lotScale = Math.min(canvas.width, canvas.height) * 0.9;
+            offset.x = (canvas.width - lotScale) / 2;
+            offset.y = (canvas.height - lotScale) / 2;
+
+            const toCanvas = (p) => [offset.x + p[0] * lotScale, offset.y + p[1] * lotScale];
+
+            // A. High-Tech Lanes
+            ctx.strokeStyle = "rgba(148, 163, 184, 0.15)";
+            ctx.lineWidth = 35;
+            ctx.lineCap = "round";
+            mapping.edges.forEach(e => {
+                const p1 = toCanvas(mapping.nodes[e[0]]);
+                const p2 = toCanvas(mapping.nodes[e[1]]);
+                ctx.beginPath(); ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.stroke();
+            });
+
+            // B. Slots
+            mapping.spots.forEach((poly, idx) => {
+                const spotId = idx + 1;
+                const status = currentSpots.find(s => s.spot_id === spotId);
+                const isOcc = status ? status.occupied : false;
+                if (isOcc) {
+                    drawStaticCar(pts);
+                } else if (matchesTarget) {
+                    ctx.fillStyle = "rgba(0, 243, 255, 0.1)";
+                    ctx.fill();
+                    ctx.shadowBlur = 10; ctx.shadowColor = "var(--neon-blue)";
+                    ctx.strokeStyle = "var(--neon-blue)";
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+
+                    // Destination Marker Pin
+                    const cx = pts.reduce((a, b) => a + b[0], 0) / 4;
+                    const cy = pts.reduce((a, b) => a + b[1], 0) / 4;
+                    drawPin(cx, cy);
+                } else {
+                    ctx.fillStyle = "rgba(148, 163, 184, 0.5)";
+                    ctx.font = "bold 12px Inter";
+                    ctx.textAlign = "center";
+                    const cx = pts.reduce((a, b) => a + b[0], 0) / 4;
+                    const cy = pts.reduce((a, b) => a + b[1], 0) / 4;
+                    ctx.fillText(`${spotId}`, cx, cy + 5);
+                }
+            });
+
+            // C. Entrance Marker
+            if (mapping.nodes.length > 0) {
+                const entry = toCanvas(mapping.nodes[0]);
+                drawEntrance(entry[0], entry[1]);
+            }
+
+            // D. guidance Route
+            if (isGuidanceActive && navRoute && navRoute.length > 1) {
+                ctx.strokeStyle = "var(--neon-blue)";
+                ctx.lineWidth = 10;
+                ctx.lineCap = "round";
+                ctx.shadowBlur = 15; ctx.shadowColor = "var(--neon-blue)";
+                ctx.beginPath();
+                const s = toCanvas(mapping.nodes[navRoute[0]]);
+                ctx.moveTo(s[0], s[1]);
+                for (let i = 1; i < navRoute.length; i++) {
+                    const p = toCanvas(mapping.nodes[navRoute[i]]);
+                    ctx.lineTo(p[0], p[1]);
+                }
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+
+                // Active Car Navigation
+                navProgress = (navProgress + 0.003) % 1;
+                const segs = navRoute.length - 1;
+                const segIdx = Math.floor(navProgress * segs);
+                const t = (navProgress * segs) % 1;
+                const p1 = toCanvas(mapping.nodes[navRoute[segIdx]]);
+                const p2 = toCanvas(mapping.nodes[navRoute[segIdx + 1]]);
+                const dx = p1[0] + (p2[0] - p1[0]) * t;
+                const dy = p1[1] + (p2[1] - p1[1]) * t;
+                const angle = Math.atan2(p2[1] - p1[1], p2[0] - p1[0]);
+
+                drawLiveCar(dx, dy, angle);
+                requestAnimationFrame(drawBlueprint);
+            }
+        }
+
+        function drawEntrance(x, y) {
+            ctx.fillStyle = "rgba(0, 243, 255, 0.3)";
+            ctx.beginPath(); ctx.arc(x, y, 15, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "var(--neon-blue)";
+            ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill();
+        }
+
+        function drawPin(x, y) {
+            ctx.save();
+
+            // 1. Ground Shadow
+            ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
+            ctx.beginPath();
+            ctx.ellipse(x, y + 4, 12, 5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 2. High-Fidelity Teardrop Body
+            ctx.fillStyle = "#ef4444";
+            ctx.beginPath();
+            ctx.moveTo(x, y); // The Tip
+            ctx.bezierCurveTo(x - 12, y - 5, x - 15, y - 15, x - 15, y - 22);
+            ctx.arc(x, y - 22, 15, Math.PI, 0, false);
+            ctx.bezierCurveTo(x + 15, y - 15, x + 12, y - 5, x, y);
+            ctx.fill();
+
+            // 3. Inner Contrast Circle
+            ctx.fillStyle = "#b91c1c";
+            ctx.beginPath();
+            ctx.arc(x, y - 22, 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawStaticCar(pts) {
+            const cx = pts.reduce((a, b) => a + b[0], 0) / 4;
+            const cy = pts.reduce((a, b) => a + b[1], 0) / 4;
+            const angle = Math.atan2(pts[1][1] - pts[0][1], pts[1][0] - pts[0][0]);
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(angle);
+            ctx.fillStyle = "#334155";
+            ctx.roundRect(-12, -7, 24, 14, 4); ctx.fill();
+            ctx.restore();
+        }
+
+        function drawLiveCar(x, y, angle) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+            ctx.shadowBlur = 10; ctx.shadowColor = "#fff";
+            ctx.fillStyle = "#f8fafc";
+            ctx.beginPath();
+            ctx.roundRect(-15, -9, 30, 18, 5);
+            ctx.fill();
+            // Windows
+            ctx.fillStyle = "#0f172a";
+            ctx.fillRect(8, -7, 4, 14);
+            ctx.restore();
+        }
+
+        function requestNavigation() {
+            if (!recommendedId || !mapping) return;
+            navRoute = findShortestPath(0, recommendedId - 1);
+            if (!navRoute) {
+                alert("PATH ERROR: Check entrance connections in Architect.");
+            } else {
+                isGuidanceActive = true;
+                navProgress = 0;
+                document.getElementById('start-nav').style.display = 'none';
+                document.getElementById('end-nav').style.display = 'block';
+                document.getElementById('nav-badge').innerText = "GUIDANCE ACTIVE";
+                document.getElementById('nav-badge').style.color = "var(--neon-green)";
+            }
+        }
+
+        function stopNavigation() {
+            isGuidanceActive = false;
+            navRoute = null;
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+
+</html>

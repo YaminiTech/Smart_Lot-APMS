@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMART LOT | Matrix Stitcher Canvas</title>
+    <link rel="stylesheet" href="/css/global.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        .architect-layout {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            height: 100vh;
+            background: #000;
+        }
+        .toolbar {
+            background: #020617;
+            border-right: 1px solid var(--border-muted);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            overflow-y: auto;
+        }
+        .canvas-container {
+            position: relative;
+            flex-grow: 1;
+            background: #050510;
+            overflow: auto;
+        }
+        .zone-layer {
+            position: absolute;
+            cursor: grab;
+            border: 2px dashed rgba(0, 243, 255, 0.3);
+            transition: border-color 0.2s;
+            transform-origin: top left;
+        }
+        .zone-layer.active {
+            border: 2px solid var(--neon-green);
+            z-index: 100;
+        }
+        .zone-layer canvas {
+            display: block;
+            pointer-events: none; /* Let parent div catch drags, nodes catch clicks */
+        }
+        .global-svg {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 50;
+        }
+        .node-btn {
+            position: absolute;
+            width: 14px; height: 14px;
+            background: var(--neon-blue);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            cursor: crosshair;
+            z-index: 200;
+            border: 2px solid #000;
+        }
+        .node-btn:hover {
+            background: var(--neon-green);
+            transform: translate(-50%, -50%) scale(1.5);
+        }
+        .tool-btn {
+            width: 100%; padding: 0.8rem;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-muted);
+            border-radius: 12px; color: var(--text-secondary);
+            cursor: pointer; display: flex; align-items: center; gap: 12px;
+        }
+        .tool-btn.active {
+            background: rgba(0, 243, 255, 0.1); border-color: var(--neon-blue); color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="architect-layout">
+        <aside class="toolbar">
+            <h2 class="neon-text-blue" style="margin:0;">GRID STITCHER</h2>
+            <a href="/admin" style="text-decoration:none; font-size: 0.7rem; color: var(--text-dim);">← BACK TO ADMIN</a>
+            
+            <div style="margin-top: 1rem;">
+                <label class="nav-label">1. Tool Engine</label>
+                <button class="tool-btn active" id="mode-drag" onclick="setMode('DRAG')">✋ Move / Align Zones</button>
+                <button class="tool-btn" id="mode-stitch" onclick="setMode('STITCH')">🔗 Connect Cross-Zone Node</button>
+            </div>
+
+            <div style="margin-top: 1rem;">
+                <label class="nav-label">2. Matrix Controls</label>
+                <button class="tool-btn" style="border-color: var(--neon-red); color: var(--neon-red);" onclick="wipeStitching()">🧨 Wipe & Reset All Connections</button>
+            </div>
+
+            <div style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-dim); line-height: 1.6;">
+                <b>Instructions:</b><br><br>
+                1. <b>Move Zones:</b> Drag the video grids anywhere to match their real-world relative landscape.<br><br>
+                2. <b>Connect Notes:</b> Switch to Connect mode. Click a node in one camera, and drag an edge to a node in another camera to link them.<br><br>
+                3. Offset math saves instantly in real-time.
+            </div>
+            
+            <button class="btn-cyber" style="margin-top: auto;" onclick="window.location.reload()">REFRESH MATRIX</button>
+        </aside>
+
+        <main class="canvas-container" id="workspace">
+            <svg class="global-svg" id="edges-layer"></svg>
+            <svg class="global-svg" style="z-index:900" id="draft-edge-layer">
+                <line id="draft-edge" stroke="rgba(57, 255, 20, 0.8)" stroke-width="4" stroke-dasharray="5,5" x1="0" y1="0" x2="0" y2="0" display="none"/>
+            </svg>
+            <!-- Zones will dynamically cascade here -->
+        </main>
+    </div>
+
+    <script src="/js/core.js"></script>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const lot_id = urlParams.get('lot_id');
+        const workspace = document.getElementById('workspace');
+        
+        let mode = 'DRAG'; // DRAG or STITCH
+        let zonesData = [];
+        let edgesData = [];
+        let stitchStartNode = null; 
+
+        function setMode(m) {
+            mode = m;
+            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`mode-${m.toLowerCase()}`).classList.add('active');
+            
+            document.querySelectorAll('.zone-layer').forEach(z => {
+                z.style.pointerEvents = (mode === 'DRAG') ? 'auto' : 'none';
+            });
+            document.querySelectorAll('.node-btn').forEach(n => {
+                n.style.pointerEvents = (mode === 'STITCH') ? 'auto' : 'none';
+            });
+            stitchStartNode = null;
+            document.getElementById('draft-edge').setAttribute('display', 'none');
+        }
+
+        async function init() {
+            const data = await API.getLotMap(lot_id);
+            if (data.status === 'success') {
+                zonesData = data.zones;
+                edgesData = data.edges;
+                
+                // Robust Sync: Wait for all zone images to load before rendering edges
+                const loadPromises = zonesData.map(z => renderZone(z));
+                await Promise.all(loadPromises);
+                renderGlobalEdges();
+            }
+        }
+
+        function renderZone(z) {
+            return new Promise((resolve) => {
+                const zDiv = document.createElement('div');
+                zDiv.className = 'zone-layer';
+                zDiv.style.left = z.offset_x + 'px';
+                zDiv.style.top = z.offset_y + 'px';
+                zDiv.dataset.zoneId = z.id;
+                
+                const img = new Image();
+                img.src = `/api/get_frame?filename=${z.filename}`;
+                img.onload = () => {
+                    const c = document.createElement('canvas');
+                    c.width = img.width; c.height = img.height;
+                    const ctx = c.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+                    ctx.fillRect(0,0,c.width,c.height);
+
+                    z.spots.forEach((s, idx) => {
+                        const poly = s.poly.map(p => [p[0] * img.width, p[1] * img.height]);
+                        ctx.strokeStyle = "var(--neon-green)";
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.moveTo(poly[0][0], poly[0][1]);
+                        poly.slice(1).forEach(p => ctx.lineTo(p[0], p[1]));
+                        ctx.closePath();
+                        ctx.stroke();
+                        ctx.fillStyle = "rgba(57, 255, 20, 0.05)";
+                        ctx.fill();
+                    });
+
+                    z.nodes.forEach(n => {
+                        const btn = document.createElement('div');
+                        btn.className = 'node-btn';
+                        btn.style.left = n.x + 'px';
+                        btn.style.top = n.y + 'px';
+                        btn.dataset.nodeId = n.id;
+                        btn.dataset.zoneId = z.id;
+                        btn.dataset.nx = n.x; btn.dataset.ny = n.y;
+                        btn.style.pointerEvents = (mode === 'STITCH') ? 'auto' : 'none';
+                        btn.onmousedown = (e) => handleNodeClick(e, btn);
+                        
+                        if (n.label) {
+                            const lbl = document.createElement('div');
+                            lbl.innerText = n.label;
+                            lbl.style.position = 'absolute';
+                            lbl.style.left = '15px'; lbl.style.top = '-15px';
+                            lbl.style.color = 'var(--neon-green)';
+                            lbl.style.fontSize = '0.7rem';
+                            lbl.style.fontWeight = 'bold';
+                            lbl.style.pointerEvents = 'none';
+                            lbl.style.whiteSpace = 'nowrap';
+                            btn.appendChild(lbl);
+                        }
+                        zDiv.appendChild(btn);
+                    });
+                    zDiv.appendChild(c);
+                    
+                    zDiv.onmousedown = (e) => {
+                        if (mode !== 'DRAG') return;
+                        e.preventDefault();
+                        const startX = e.clientX; const startY = e.clientY;
+                        const startLeft = parseFloat(zDiv.style.left); const startTop = parseFloat(zDiv.style.top);
+                        
+                        document.querySelectorAll('.zone-layer').forEach(div => div.classList.remove('active'));
+                        zDiv.classList.add('active');
+
+                        window.onmousemove = (ev) => {
+                            const dx = ev.clientX - startX; const dy = ev.clientY - startY;
+                            zDiv.style.left = (startLeft + dx) + 'px';
+                            zDiv.style.top = (startTop + dy) + 'px';
+                            renderGlobalEdges(); 
+                        };
+                        window.onmouseup = async () => {
+                            window.onmousemove = null; window.onmouseup = null;
+                            const newX = parseFloat(zDiv.style.left); const newTop = parseFloat(zDiv.style.top);
+                            const zoneObj = zonesData.find(zo => zo.id == z.id);
+                            zoneObj.offset_x = newX; zoneObj.offset_y = newTop;
+                            await API.updateZoneOffset(z.id, newX, newTop);
+                        };
+                    };
+                    workspace.appendChild(zDiv);
+                    resolve();
+                };
+            });
+        }
+
+        function handleNodeClick(e, btn) {
+            e.stopPropagation();
+            if (mode !== 'STITCH') return;
+            const nid = btn.dataset.nodeId;
+            const zid = btn.dataset.zoneId;
+            const myZ = zonesData.find(zo => zo.id == zid);
+            const gx = myZ.offset_x + parseFloat(btn.dataset.nx);
+            const gy = myZ.offset_y + parseFloat(btn.dataset.ny);
+
+            if (!stitchStartNode) {
+                // Start drawing line
+                stitchStartNode = { id: nid, gx, gy };
+                const draft = document.getElementById('draft-edge');
+                draft.setAttribute('x1', gx); draft.setAttribute('y1', gy);
+                draft.setAttribute('x2', gx); draft.setAttribute('y2', gy);
+                draft.setAttribute('display', 'line');
+                
+                window.onmousemove = (ev) => {
+                    const rect = workspace.getBoundingClientRect();
+                    draft.setAttribute('x2', ev.clientX - rect.left + workspace.scrollLeft);
+                    draft.setAttribute('y2', ev.clientY - rect.top + workspace.scrollTop);
+                };
+            } else {
+                // Complete Edge!
+                window.onmousemove = null;
+                document.getElementById('draft-edge').setAttribute('display', 'none');
+                if (stitchStartNode.id !== nid) {
+                    let w = prompt("Optional: Enter the estimated physical travel distance or time between these portals (e.g. '50' for 50 meters). Press Enter to skip and auto-calculate using standard pixel geometry:");
+                    let manual_weight = w ? parseFloat(w) : null;
+                    if (w && isNaN(manual_weight)) {
+                        alert("Invalid formatting. Edge creation aborted.");
+                        stitchStartNode = null; return;
+                    }
+                    
+                    API.addGlobalEdge(lot_id, stitchStartNode.id, nid, manual_weight).then(res => {
+                        if (res.status === 'success') {
+                            edgesData.push({ id: res.edge_id, node_a: parseInt(stitchStartNode.id), node_b: parseInt(nid), manual_weight });
+                            renderGlobalEdges();
+                        }
+                    });
+                }
+                stitchStartNode = null;
+            }
+        }
+
+        // To cancel edge drawing mid-way
+        workspace.oncontextmenu = (e) => {
+            e.preventDefault();
+            if (stitchStartNode) {
+                stitchStartNode = null;
+                window.onmousemove = null;
+                document.getElementById('draft-edge').setAttribute('display', 'none');
+            }
+            return false;
+        };
+
+        function renderGlobalEdges() {
+            const svg = document.getElementById('edges-layer');
+            svg.innerHTML = '';
+            
+            // Re-fetch absolute bounding rect positions for all nodes
+            edgesData.forEach(e => {
+                const btnA = document.querySelector(`.node-btn[data-node-id="${e.node_a}"]`);
+                const btnB = document.querySelector(`.node-btn[data-node-id="${e.node_b}"]`);
+                if (btnA && btnB) {
+                    const zA = zonesData.find(zo => zo.id == btnA.dataset.zoneId);
+                    const zB = zonesData.find(zo => zo.id == btnB.dataset.zoneId);
+                    
+                    const x1 = zA.offset_x + parseFloat(btnA.dataset.nx);
+                    const y1 = zA.offset_y + parseFloat(btnA.dataset.ny);
+                    const x2 = zB.offset_x + parseFloat(btnB.dataset.nx);
+                    const y2 = zB.offset_y + parseFloat(btnB.dataset.ny);
+                    
+                    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                    line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+                    line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+                    line.setAttribute('stroke', "var(--neon-blue)");
+                    line.setAttribute('stroke-width', '4');
+                    // Add delete handler inside SVG? Since pointer-events is none, no. We use a contextmenu trick.
+                    svg.appendChild(line);
+
+                    // Add a tiny delete button in the middle of the line
+                    const cx = (x1 + x2) / 2; const cy = (y1 + y2) / 2;
+                    const del = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    del.setAttribute('cx', cx); del.setAttribute('cy', cy);
+                    del.setAttribute('r', '8');
+                    del.setAttribute('fill', 'var(--neon-red)');
+                    del.style.pointerEvents = 'auto';
+                    del.style.cursor = 'pointer';
+                    del.onclick = async () => {
+                        if (confirm('Delete this multi-zone connection path?')) {
+                            await API.deleteEdge(e.id);
+                            edgesData = edgesData.filter(ed => ed.id !== e.id);
+                            renderGlobalEdges();
+                        }
+                    };
+                    svg.appendChild(del);
+                }
+            });
+        }
+
+        async function wipeStitching() {
+            if (confirm("CRITICAL WARNING: This will reset all cameras to alignment 0,0 and destroy all cross-camera Edge Links. The videos and spots themselves will not be damaged. Proceed?")) {
+                const res = await API.wipeStitch(lot_id);
+                if (res.status === 'success') {
+                    alert("Matrix Wiped. Resetting layout...");
+                    window.location.reload();
+                } else alert("Failed to wipe matrix.");
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

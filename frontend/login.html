@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMART LOT | Command Access</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/global.css">
+    <style>
+        .login-wrapper {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at center, #0f172a 0%, #020617 100%);
+        }
+
+        .login-box {
+            width: 100%;
+            max-width: 420px;
+            text-align: center;
+            animation: slide-up 0.6s ease-out;
+        }
+
+        .logo-ring {
+            width: 80px;
+            height: 80px;
+            border: 3px solid var(--neon-blue);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 2rem;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.2);
+            font-size: 2rem;
+            font-weight: 800;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="login-wrapper">
+        <div class="login-box">
+            <div class="logo-ring neon-text-blue">P</div>
+            <div class="cyber-card">
+                <h2 style="margin-bottom: 0.5rem;" id="form-title">Operator Login</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 2rem; font-size: 0.9rem;">Secure Management
+                    Portal</p>
+
+                <form id="login-form" style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div style="text-align: left;">
+                        <label class="nav-label">ID / Email</label>
+                        <input type="text" id="username" class="cyber-input"
+                            style="width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border-muted); color: white; padding: 12px; border-radius: 8px;"
+                            placeholder="Operator ID" required>
+                    </div>
+                    <div style="text-align: left;">
+                        <label class="nav-label">Security Key</label>
+                        <input type="password" id="password" class="cyber-input"
+                            style="width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border-muted); color: white; padding: 12px; border-radius: 8px;"
+                            placeholder="••••••••" required>
+                    </div>
+
+                    <button type="submit" class="btn-cyber" style="width: 100%; margin-top: 1rem;">
+                        Authorize Access 🚀
+                    </button>
+                </form>
+
+                <div style="margin-top: 1.5rem;">
+                    <button onclick="toggleMode()" id="toggle-btn"
+                        style="background:none; border:none; color:var(--text-dim); font-size:0.8rem; cursor:pointer; text-decoration:underline;">
+                        New Pilot? Register for Hub Access
+                    </button>
+                </div>
+            </div>
+
+            <a href="/"
+                style="display: block; margin-top: 2rem; color: var(--text-secondary); text-decoration: none; font-size: 0.9rem;">
+                ← Return to Public Terminal
+            </a>
+        </div>
+    </div>
+
+    <script>
+        let isLogin = true;
+
+        function toggleMode() {
+            isLogin = !isLogin;
+            document.getElementById('form-title').innerText = isLogin ? "Operator Login" : "Pilot Registration";
+            document.getElementById('toggle-btn').innerText = isLogin ? "New Pilot? Register for Hub Access" : "Existing Operator? Switch to Login";
+        }
+
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            const btn = e.target.querySelector('button');
+            const originalText = btn.innerText;
+            btn.innerText = "VERIFYING...";
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, isLogin })
+                });
+                const data = await res.json();
+
+                if (data.status === "success") {
+                    localStorage.setItem('admin_token', data.session);
+                    if (!isLogin) sessionStorage.setItem('run_wizard', 'true');
+                    window.location.href = '/admin';
+                } else {
+                    alert("Authorization Failed.");
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                alert("Connection Error. Is the pilot server active?");
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+
+</html>

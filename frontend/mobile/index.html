@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMART LOT | Intelligent Management</title>
+    <link rel="stylesheet" href="css/global.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;900&display=swap" rel="stylesheet">
+    <style>
+        .home-grid {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            height: calc(100vh - 100px);
+        }
+
+        .main-hero {
+            position: relative;
+            background: #000;
+            border-radius: 24px;
+            overflow: hidden;
+            border: 1px solid var(--border-muted);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        }
+
+        .hero-feed {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            opacity: 0.8;
+        }
+
+        .hero-overlay {
+            position: absolute;
+            bottom: 40px;
+            left: 40px;
+            z-index: 10;
+        }
+
+        .sidebar-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .pulse-card {
+            background: linear-gradient(135deg, var(--bg-card), #020617);
+            border: 1px solid var(--border-muted);
+            padding: 2rem;
+            border-radius: 20px;
+            text-decoration: none;
+            transition: 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .pulse-card:hover {
+            border-color: var(--accent-blue);
+            transform: scale(1.02);
+        }
+
+        .nav-label {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+
+        .live-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 8px 16px;
+            border-radius: 30px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+
+        /* Mobile Home Overrides */
+        @media (max-width: 1024px) {
+            .home-grid {
+                grid-template-columns: 1fr;
+                height: auto;
+                padding: 1rem;
+                gap: 1.5rem;
+            }
+
+            .main-hero {
+                height: 350px;
+            }
+
+            h1 {
+                font-size: 2rem !important;
+            }
+
+            header {
+                padding: 1.5rem !important;
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header style="padding: 1.5rem 3rem; display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-weight: 900; font-size: 1.5rem;" class="neon-text-blue">SMART LOT VISION</div>
+        <a href="login.html" class="btn-cyber btn-secondary" style="font-size: 0.75rem; text-decoration: none;">🛡️
+            Admin
+            Login</a>
+    </header>
+
+    <main class="home-grid">
+        <!-- 1. ACTIVE RAW VIDEO FEED -->
+        <section class="main-hero">
+            <img src="/raw_feed" class="hero-feed" id="main-video-feed" onerror="this.src=''">
+            <div class="hero-overlay">
+                <div class="live-status">
+                    <span class="status-dot active"></span>
+                    <span id="active-filename">NO ACTIVE VIDEO AVAILABLE</span>
+                </div>
+                <h1 style="font-size: 3rem; margin-top: 1rem; line-height: 1;">Intelligent Hub<br><span
+                        class="neon-text-blue">RAW FEED</span></h1>
+            </div>
+            <!-- Standby Overlay -->
+            <div id="no-source"
+                style="position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: #020617; flex-direction: column; gap: 20px;">
+                <div style="font-size: 4rem; opacity: 0.2;">📹</div>
+                <p style="color: var(--text-dim); font-weight: 700;">WAITING FOR ADMIN TO SELECT SOURCE...</p>
+            </div>
+        </section>
+
+        <!-- NAVIGATION & STATS -->
+        <aside class="sidebar-nav">
+            <!-- 4 CORE STATS -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 1rem;">
+                <div class="cyber-card" style="padding: 1rem;">
+                    <span class="nav-label">Total Slots</span>
+                    <h2 id="stat-total" style="font-size: 1.5rem;">--</h2>
+                </div>
+                <div class="cyber-card" style="padding: 1rem;">
+                    <span class="nav-label">Occupied</span>
+                    <h2 id="stat-occupied" class="neon-text-red" style="font-size: 1.5rem;">--</h2>
+                </div>
+                <div class="cyber-card" style="padding: 1rem;">
+                    <span class="nav-label">Available</span>
+                    <h2 id="stat-free" class="neon-text-green" style="font-size: 1.5rem;">--</h2>
+                </div>
+                <div class="cyber-card" style="padding: 1rem;">
+                    <span class="nav-label">OCCUPANCY RATE</span>
+                    <h2 id="stat-rate" style="font-size: 1.5rem;">--%</h2>
+                </div>
+            </div>
+
+            <a href="driver.html" class="pulse-card" style="margin-top: 1rem;">
+                <span class="nav-label">Navigation</span>
+                <h2 style="margin-bottom: 0.5rem;">Find Parking Now 🚀</h2>
+                <p style="font-size: 0.8rem; color: var(--text-secondary);">Access the 2D schematic map and get guided
+                    to the closest empty spot.</p>
+            </a>
+
+            <a href="viewer.html" class="pulse-card">
+                <span class="nav-label">AI Telemetry</span>
+                <h2 style="margin-bottom: 0.5rem;">View Full Camera 📹</h2>
+                <p style="font-size: 0.8rem; color: var(--text-secondary);">Access the full AI-filtered feed with
+                    red/green detection visualization.</p>
+            </a>
+        </aside>
+    </main>
+
+    <script src="js/core.js"></script>
+    <script>
+        async function instantUpdate() {
+            const data = await API.fetchSpots();
+            updateUI(data);
+        }
+        instantUpdate();
+
+        runHeartbeat(updateUI);
+
+        function updateUI(data) {
+            const label = document.getElementById('active-filename');
+            const placeholder = document.getElementById('no-source');
+            const feedImg = document.getElementById('main-video-feed');
+
+            // 1. Update Feed Status
+            if (data.active) {
+                label.innerText = `ACTIVE: ${data.active}`;
+                placeholder.style.display = 'none';
+                if (!feedImg.src.includes('/raw_feed')) feedImg.src = '/raw_feed';
+            } else {
+                label.innerText = "NO ACTIVE VIDEO YET";
+                placeholder.style.display = 'flex';
+                feedImg.src = "";
+            }
+
+            // 2. Update 4 Mandatory Stats
+            const spots = data.spots || [];
+            const total = spots.length;
+            const occ = spots.filter(s => s.occupied).length;
+            const free = total - occ;
+            const rate = total > 0 ? Math.round((occ / total) * 100) : 0;
+
+            document.getElementById('stat-total').innerText = total;
+            document.getElementById('stat-occupied').innerText = occ;
+            document.getElementById('stat-free').innerText = free;
+            document.getElementById('stat-rate').innerText = rate + "%";
+        }
+    </script>
+</body>
+
+</html>

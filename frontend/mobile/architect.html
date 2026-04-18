@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMART LOT | Architect Pro</title>
+    <link rel="stylesheet" href="css/global.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        .architect-layout {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            height: 100vh;
+            background: #000;
+        }
+
+        .toolbar {
+            background: #020617;
+            border-right: 1px solid var(--border-muted);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            overflow-y: auto;
+        }
+
+        .canvas-container {
+            position: relative;
+            flex-grow: 1;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        canvas {
+            background: #111;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 1);
+            cursor: crosshair;
+        }
+
+        .tool-group {
+            margin-bottom: 1rem;
+        }
+
+        .tool-btn {
+            width: 100%;
+            padding: 0.8rem;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-muted);
+            border-radius: 12px;
+            color: var(--text-secondary);
+            text-align: left;
+            cursor: pointer;
+            transition: 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        .tool-btn.active {
+            background: rgba(0, 243, 255, 0.1);
+            border-color: var(--neon-blue);
+            color: var(--text-primary);
+            font-weight: 700;
+        }
+
+        .instructions-panel {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 0.8rem;
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            line-height: 1.6;
+            margin-top: 1rem;
+            border: 1px dashed var(--border-muted);
+        }
+
+        .instructions-panel b {
+            color: var(--text-primary);
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        /* Mobile Blocker Styling */
+        .mobile-blocker {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: #020617;
+            z-index: 9999;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        @media (max-width: 1024px) {
+            .mobile-blocker {
+                display: flex !important;
+            }
+
+            .architect-layout {
+                display: none !important;
+            }
+        }
+
+        /* Mobile Blocker Styling */
+        @media (max-width: 768px) {
+            .mobile-blocker {
+                display: flex !important;
+            }
+
+            .architect-layout {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 1. MOBILE BLOCKER OVERLAY -->
+    <div class="mobile-blocker" style="display:none;">
+        <div style="font-size: 5rem; margin-bottom: 2rem;">💻</div>
+        <h1 class="neon-text-blue" style="font-size: 1.5rem; margin-bottom: 1rem;">LAPTOP REQUIRED</h1>
+        <p style="color: var(--text-secondary); max-width: 300px; line-height: 1.6; margin-bottom: 2rem;">
+            Architect Pro requires precise mouse input for mapping. Please open this service on a <b>Desktop or
+                Laptop</b> to continue.
+        </p>
+        <a href="admin.html" class="btn-cyber btn-secondary" style="text-decoration:none;">Back to Dashboard</a>
+    </div>
+
+    <div class="architect-layout" id="main-arch-layout">
+        <aside class="toolbar">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+                <h2 class="neon-text-blue" style="margin:0;">ARCHITECT PRO</h2>
+                <a href="admin.html" style="text-decoration:none; font-size: 0.7rem; color: var(--text-dim);">← BACK</a>
+            </div>
+            <p id="filename-label" style="font-size: 0.65rem; color: var(--text-dim); margin-top: -10px;">VIRTUALIZING:
+                --</p>
+
+            <div class="tool-group">
+                <label class="nav-label">1. Draw Mode</label>
+                <button class="tool-btn active" id="mode-spots" onclick="setMode('SPOTS')">⬛ Draw Parking Spots</button>
+                <button class="tool-btn" id="mode-nodes" onclick="setMode('NODES')">📍 Nodes (Turns/Exits)</button>
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <button class="tool-btn" id="mode-paths" onclick="setMode('PATHS')">🛣️ Path Setting
+                        (Lanes)</button>
+                    <button id="btn-end-path" onclick="selectedNodeIdx = null; redraw()"
+                        style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); color: #f59e0b; font-size: 0.65rem; padding: 4px; border-radius: 4px; cursor: pointer; display: none; align-items: center; justify-content: center; gap: 5px;">
+                        🛑 End Current Path (Right-Click)
+                    </button>
+                </div>
+            </div>
+
+            <div class="tool-group">
+                <label class="nav-label">2. Operations</label>
+                <button class="tool-btn" onclick="undo()" style="background: rgba(245, 158, 11, 0.05);">↩️ Undo
+                    Action</button>
+                <button class="tool-btn" onclick="resetCanvas()" style="background: rgba(239, 68, 68, 0.05);">🗑️ Wipe
+                    Mesh</button>
+            </div>
+
+            <div class="instructions-panel">
+                <b>HOW TO MAP:</b>
+                • <b>Spots:</b> Click 4 corners to define a lot.<br>
+                • <b>Nodes:</b> Click to place Entrance / Turns.<br>
+                • <b>Paths:</b> Click Start, then End. <b>Right-click</b> to break chain.<br>
+                • <b>Precision:</b> Points auto-snap to nearby vertices.<br>
+                • <b>Save:</b> Press "Save & Deploy" when finished.
+            </div>
+
+            <div style="margin-top: auto; padding-top: 1rem;">
+                <div
+                    style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-dim); margin-bottom: 10px;">
+                    <span>Spots: <b id="stat-spots" style="color:var(--neon-green)">0</b></span>
+                    <span>Nodes: <b id="stat-nodes" style="color:var(--neon-blue)">0</b></span>
+                    <span>Path Segments: <b id="stat-paths" style="color:var(--neon-blue)">0</b></span>
+                </div>
+                <button class="btn-cyber" style="width:100%;" onclick="saveMap()">SAVE & DEPLOY MESH</button>
+            </div>
+        </aside>
+
+        <main class="canvas-container">
+            <canvas id="art-board"></canvas>
+        </main>
+    </div>
+
+    <script src="js/core.js"></script>
+    <script>
+        // Ironclad Mobile Detection
+        function enforceLockout() {
+            const isMobile = window.innerWidth <= 1024 || ('ontouchstart' in window);
+            const blocker = document.getElementById('mobile-lockout');
+            const layout = document.getElementById('main-arch-layout');
+
+            if (isMobile) {
+                blocker.style.display = 'flex';
+                layout.style.display = 'none';
+            } else {
+                blocker.style.display = 'none';
+                layout.style.display = 'flex';
+            }
+        }
+        window.addEventListener('resize', enforceLockout);
+        enforceLockout();
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const filename = urlParams.get('filename');
+        const canvas = document.getElementById('art-board');
+        const ctx = canvas.getContext('2d');
+
+        let img = new Image();
+        let mode = 'SPOTS';
+        let spots = []; // Array of polygons [[x,y]x4]
+        let nodes = []; // Array of points [x,y]
+        let edges = []; // Array of indices [from, to]
+        let currentDraft = [];
+        let selectedNodeIdx = null; // Used for forming paths
+        let lastSnap = null;
+
+        document.getElementById('filename-label').innerText = "VIRTUALIZING: " + filename;
+
+        function setMode(m) {
+            mode = m;
+            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`mode-${m.toLowerCase()}`).classList.add('active');
+
+            // Contextual sub-option visibility
+            document.getElementById('btn-end-path').style.display = (m === 'PATHS') ? 'flex' : 'none';
+
+            currentDraft = [];
+            selectedNodeIdx = null;
+            redraw();
+        }
+
+        img.src = `/api/get_frame?filename=${filename}`;
+
+        // 2. INTELLIGENT AUTO-LOAD (Dialogue 7)
+        // Fetch existing configuration so user doesn't have to redraw everything
+        async function loadExistingConfig() {
+            const data = await API.fetchSpots();
+            if (data.mapping) {
+                // Denormalize coordinates back to pixels
+                spots = (data.mapping.spots || []).map(s => s.map(p => [p[0] * img.width, p[1] * img.height]));
+                nodes = (data.mapping.nodes || []).map(n => [n[0] * img.width, n[1] * img.height]);
+                edges = data.mapping.edges || [];
+                redraw();
+            }
+        }
+
+        img.onload = () => {
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const container = document.querySelector('.canvas-container');
+            const ratio = Math.min((container.clientWidth - 40) / img.width, (container.clientHeight - 40) / img.height);
+            canvas.style.width = (img.width * ratio) + "px";
+            canvas.style.height = (img.height * ratio) + "px";
+
+            loadExistingConfig(); // Load data after image dimensions are known
+            redraw();
+        };
+
+        canvas.onmousedown = (e) => {
+            let { x, y } = getMousePos(e);
+
+            // 1. SNAPPING ENGINE (Dialogue 6)
+            const snap = getSnapPoint(x, y);
+            if (snap) {
+                x = snap.x;
+                y = snap.y;
+            }
+
+            if (mode === 'SPOTS') {
+                currentDraft.push([x, y]);
+                if (currentDraft.length === 4) {
+                    spots.push([...currentDraft]);
+                    currentDraft = [];
+                }
+            } else if (mode === 'NODES') {
+                nodes.push([x, y]);
+            } else if (mode === 'PATHS') {
+                const nodeIdx = nodes.findIndex(n => Math.hypot(n[0] - x, n[1] - y) < 15);
+                if (nodeIdx !== -1) {
+                    if (selectedNodeIdx === null) {
+                        selectedNodeIdx = nodeIdx;
+                    } else if (selectedNodeIdx !== nodeIdx) {
+                        edges.push([selectedNodeIdx, nodeIdx]);
+                        // Only daisy-chain if user wants to continue
+                        selectedNodeIdx = nodeIdx;
+                    }
+                }
+            }
+            redraw();
+        };
+
+        canvas.oncontextmenu = (e) => {
+            e.preventDefault();
+            selectedNodeIdx = null;
+            currentDraft = [];
+            redraw();
+            return false;
+        };
+
+        function getSnapPoint(x, y) {
+            const threshold = 15;
+            // Snap to nodes
+            for (let n of nodes) {
+                if (Math.hypot(n[0] - x, n[1] - y) < threshold) return { x: n[0], y: n[1] };
+            }
+            // Snap to spot corners
+            for (let s of spots) {
+                for (let p of s) {
+                    if (Math.hypot(p[0] - x, p[1] - y) < threshold) return { x: p[0], y: p[1] };
+                }
+            }
+            return null;
+        }
+
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return {
+                x: (e.clientX - rect.left) * scaleX,
+                y: (e.clientY - rect.top) * scaleY
+            };
+        }
+
+        function undo() {
+            if (currentDraft.length > 0) currentDraft.pop();
+            else if (mode === 'SPOTS' && spots.length > 0) spots.pop();
+            else if (mode === 'NODES' && nodes.length > 0) nodes.pop();
+            else if (mode === 'PATHS' && edges.length > 0) edges.pop();
+            redraw();
+        }
+
+        function resetCanvas() {
+            if (confirm("Wipe all drawn data?")) {
+                spots = []; nodes = []; edges = []; currentDraft = [];
+                redraw();
+            }
+        }
+
+        function redraw() {
+            ctx.drawImage(img, 0, 0);
+            document.getElementById('stat-spots').innerText = spots.length;
+            document.getElementById('stat-nodes').innerText = nodes.length;
+            document.getElementById('stat-paths').innerText = edges.length;
+
+            // Spots
+            spots.forEach((s, idx) => {
+                ctx.strokeStyle = "var(--neon-green)";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(s[0][0], s[0][1]);
+                s.slice(1).forEach(p => ctx.lineTo(p[0], p[1]));
+                ctx.closePath();
+                ctx.stroke();
+                ctx.fillStyle = "rgba(57, 255, 20, 0.1)";
+                ctx.fill();
+                ctx.fillStyle = "#fff";
+                ctx.font = "bold 14px Inter";
+                ctx.fillText(`${idx + 1}`, s[0][0] + 5, s[0][1] + 20);
+            });
+
+            // Paths (Edges)
+            edges.forEach(e => {
+                ctx.strokeStyle = "rgba(0, 243, 255, 0.4)";
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(nodes[e[0]][0], nodes[e[0]][1]);
+                ctx.lineTo(nodes[e[1]][0], nodes[e[1]][1]);
+                ctx.stroke();
+            });
+
+            // Nodes
+            nodes.forEach((n, idx) => {
+                ctx.fillStyle = idx === selectedNodeIdx ? "var(--neon-green)" : "var(--neon-blue)";
+                ctx.beginPath(); ctx.arc(n[0], n[1], 6, 0, Math.PI * 2); ctx.fill();
+                if (idx === 0) {
+                    ctx.fillStyle = "var(--neon-blue)";
+                    ctx.fillText("ENTRANCE", n[0] + 10, n[1] - 10);
+                }
+            });
+
+            // Drafts
+            if (currentDraft.length > 0) {
+                ctx.strokeStyle = "#fff";
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(currentDraft[0][0], currentDraft[0][1]);
+                currentDraft.slice(1).forEach(p => ctx.lineTo(p[0], p[1]));
+                ctx.stroke();
+            }
+        }
+
+        async function saveMap() {
+            // Logic: Link each spot to its closest navigation node (Arrival Node)
+            const spotNodeLinks = spots.map(s => {
+                const cx = s.reduce((sum, p) => sum + p[0], 0) / 4;
+                const cy = s.reduce((sum, p) => sum + p[1], 0) / 4;
+                let bestNode = 0;
+                let minDist = Infinity;
+                nodes.forEach((n, idx) => {
+                    const d = Math.hypot(n[0] - cx, n[1] - cy);
+                    if (d < minDist) { minDist = d; bestNode = idx; }
+                });
+                return bestNode;
+            });
+
+            const config = {
+                filename: filename,
+                spots: spots.map(s => s.map(p => [p[0] / img.width, p[1] / img.height])),
+                nodes: nodes.map(n => [n[0] / img.width, n[1] / img.height]),
+                edges: edges,
+                spot_node_links: spotNodeLinks
+            };
+            const res = await API.saveConfig({ [filename]: config });
+            if (res.status === 'success') {
+                alert("Smart-Mesh Logic Deployed with Spot-to-Node Linking.");
+                window.location.href = '/admin';
+            }
+        }
+    </script>
+</body>
+
+</html>

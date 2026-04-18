@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Lote Vision | Navigation</title>
+    <link rel="stylesheet" href="/css/global.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background: var(--bg-deep);
+            color: var(--text-primary);
+            overflow: hidden;
+        }
+
+        .driver-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            display: flex;
+            flex-direction: row;
+            gap: 2rem;
+            height: calc(100vh - 40px);
+            align-items: stretch;
+        }
+
+        .hud-side {
+            width: 380px;
+            flex-shrink: 0;
+            background: var(--bg-card);
+            padding: 2.5rem;
+            border-radius: 28px;
+            border: 1px solid var(--border-muted);
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--shadow-card);
+        }
+
+        .blueprint-card {
+            background: #020617;
+            /* Dark asphalt */
+            border-radius: 28px;
+            border: 1px solid var(--border-muted);
+            flex-grow: 1;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            cursor: crosshair;
+        }
+
+        .avail-count {
+            font-size: 4.5rem;
+            font-weight: 900;
+            color: var(--neon-blue);
+            line-height: 1;
+            margin: 0.5rem 0;
+            text-shadow: 0 0 20px rgba(0, 243, 255, 0.3);
+        }
+
+        .recommendation-panel {
+            background: var(--bg-deep);
+            padding: 1.5rem;
+            border-radius: 20px;
+            border: 1px solid var(--accent-blue);
+            margin-top: auto;
+            text-align: left;
+            position: relative;
+        }
+
+        .btn-end {
+            background: var(--neon-red);
+            margin-top: 10px;
+        }
+
+        .pop-up {
+            position: fixed;
+            top: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--neon-red);
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 12px;
+            font-weight: 700;
+            box-shadow: 0 10px 30px rgba(255, 49, 49, 0.4);
+            display: none;
+            z-index: 1000;
+            animation: slide-up 0.3s ease;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="occupied-alert" class="pop-up">⚠️ SPACE OCCUPIED! REROUTING...</div>
+
+    <!-- LOT SELECTION MODAL -->
+    <div id="lot-selector" style="position: fixed; inset: 0; background: var(--bg-deep); z-index: 5000; display: none; align-items: center; justify-content: center; padding: 2rem;">
+        <div style="max-width: 600px; width: 100%;">
+            <h1 class="neon-text-blue" style="font-size: 2.5rem; text-align: center; margin-bottom: 2rem;">SELECT YOUR DESTINATION</h1>
+            <div id="lots-list" style="display: grid; gap: 1rem;">
+                <!-- Lots will list here -->
+                <p style="text-align: center; color: var(--text-dim);">Scanning for active parking hubs...</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="driver-container">
+        <!-- 1. DRIVER HUD -->
+        <aside class="hud-side">
+            <a href="/"
+                style="text-decoration: none; color: var(--text-dim); font-size: 0.75rem; font-weight: 700; margin-bottom: 2rem; display: block; letter-spacing: 1px;">←
+                EXIT NAVIGATION</a>
+
+            <div style="text-align: center; margin-bottom: 3rem;">
+                <span class="nav-label">TOTAL AVAILABILITY</span>
+                <div class="avail-count" id="avail-hero">--</div>
+                <p id="status-string"
+                    style="font-weight: 800; color: var(--neon-green); text-transform: uppercase; letter-spacing: 2px; font-size: 0.8rem;">
+                    Ready for Departure</p>
+            </div>
+
+            <div id="rec-panel" class="recommendation-panel">
+                <span id="nav-badge" class="nav-label" style="color: var(--neon-blue);">TARGETING NEAREST</span>
+                <h4 id="rec-id" style="font-size: 1.8rem; margin: 10px 0; font-weight: 900;">Searching...</h4>
+                <p id="rec-reason" style="font-size: 0.8rem; color: var(--text-secondary);">Calculating shortest path to
+                    entrance</p>
+
+                <div id="nav-controls" style="margin-top: 20px;">
+                    <button class="btn-cyber" id="start-nav" onclick="requestNavigation()"
+                        style="width: 100%; height: 60px; font-weight: 900; font-size: 1rem;">
+                        🚀 START GUIDANCE
+                    </button>
+                    <button class="btn-cyber btn-end" id="end-nav" onclick="stopNavigation()"
+                        style="width: 100%; height: 60px; font-weight: 900; font-size: 1rem; display: none;">
+                        🏁 END ROUTING
+                    </button>
+                </div>
+
+                <!-- FIND MY CAR MODULE -->
+                <div id="retrieval-controls" style="margin-top: 1.5rem; border-top: 1px solid rgba(148, 163, 184, 0.2); padding-top: 1.5rem; display: none;">
+                    <button class="btn-cyber" id="save-location" onclick="saveParkedLocation()"
+                        style="width: 100%; height: 50px; font-size: 0.85rem; background: rgba(57, 255, 20, 0.1); border-color: var(--neon-green); color: var(--neon-green);">
+                        📍 SAVE PARKED LOCATION
+                    </button>
+                    <button class="btn-cyber" id="find-car" onclick="startRetrieval()"
+                        style="width: 100%; height: 60px; font-weight: 900; font-size: 1rem; margin-top: 10px; display: none; background: rgba(234, 179, 8, 0.1); border-color: #eab308; color: #eab308;">
+                        🚗 FIND MY CAR
+                    </button>
+                </div>
+            </div>
+
+            <!-- ZONE SWITCHER HUD -->
+            <div id="zone-switcher-container" style="margin-top: 2rem; display: none;">
+                <span class="nav-label">LIVE CAMERA VIEW</span>
+                <select id="zone-select" class="cyber-input" style="width: 100%; background: #0f172a; border: 1px solid var(--neon-blue); color: #fff; padding: 10px; border-radius: 5px; cursor: pointer;" onchange="switchZoneView()">
+                    <option value="global">Unified Lot Grid</option>
+                </select>
+            </div>
+        </aside>
+        </aside>
+
+        <!-- 2. NAVIGATION BOARD -->
+        <main class="blueprint-card">
+            <canvas id="nav-canvas"></canvas>
+        </main>
+    </div>
+
+    <script src="/js/core.js"></script>
+    <script>
+        const canvas = document.getElementById('nav-canvas');
+        const ctx = canvas.getContext('2d');
+        const alertBox = document.getElementById('occupied-alert');
+
+        const urlParams = new URLSearchParams(window.location.search);
+        let lot_id = urlParams.get('lot_id');
+        let currentSpots = [];
+        let mapping = null; // This will hold the full lot status (nodes, edges, spots)
+        let recommendedId = null;
+        let navRoute = null;
+        let navProgress = 0;
+        let lotScale = 1;
+        let offset = { x: 0, y: 0 };
+        let isGuidanceActive = false;
+        let lastOccupiedStates = {};
+        let audioCtx = null;
+        let viewMode = 'global'; // 'global' or zone_id
+        let parkedSpotId = localStorage.getItem('parked_spot_id');
+        let navMode = 'parking'; // 'parking' or 'retrieval'
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        function playAlertSound() {
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime); 
+            osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.5);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.5);
+        }
+
+        function triggerHaptic() {
+            if ("vibrate" in navigator) navigator.vibrate([200, 100, 200]);
+        }
+
+        function updateRetrievalUI() {
+            const retrievalDiv = document.getElementById('retrieval-controls');
+            const findBtn = document.getElementById('find-car');
+            const saveBtn = document.getElementById('save-location');
+            
+            retrievalDiv.style.display = 'block';
+            if (parkedSpotId) {
+                findBtn.style.display = 'block';
+                saveBtn.innerText = `Update Location (Currently Spot ${parkedSpotId})`;
+            }
+        }
+
+        function initCanvas() {
+            const rect = canvas.parentNode.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            drawBlueprint();
+        }
+        window.onresize = initCanvas;
+        initCanvas();
+
+        async function boot() {
+            if (!lot_id) {
+                showLotSelector();
+                return;
+            }
+            const data = await API.getLotStatus(lot_id);
+            if (data.status === 'success') {
+                mapping = data;
+                updateUI(data);
+                setInterval(() => updateLotData(), 3000);
+            } else {
+                alert("Lot not found.");
+                showLotSelector();
+            }
+        }
+
+        async function showLotSelector() {
+            document.getElementById('lot-selector').style.display = 'flex';
+            const res = await API.getLots();
+            const list = document.getElementById('lots-list');
+            list.innerHTML = '';
+            
+            if (res.lots && res.lots.length > 0) {
+                res.lots.forEach(l => {
+                    const card = document.createElement('div');
+                    card.className = 'cyber-card pulse-card';
+                    card.style.cursor = 'pointer';
+                    card.style.padding = '1.5rem';
+                    card.style.marginBottom = '1rem';
+                    card.onclick = () => {
+                        initAudio(); // Seed interaction
+                        window.location.href = `/driver?lot_id=${l.id}`;
+                    };
+                    card.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <h3 style="margin:0; font-size: 1.2rem;">${l.name}</h3>
+                                <p style="margin: 5px 0 0; font-size: 0.75rem; color: var(--text-dim);">${l.total_slots} TOTAL SLOTS</p>
+                            </div>
+                            <div style="text-align: right;">
+                                <span class="neon-text-green" style="font-size: 1.5rem; font-weight: 900;">${l.free_slots}</span>
+                                <div style="font-size: 0.6rem; color: var(--text-dim);">AVAILABLE</div>
+                            </div>
+                        </div>
+                    `;
+                    list.appendChild(card);
+                });
+            } else {
+                list.innerHTML = '<p style="text-align: center; color: var(--neon-red);">NO PARKING HUBS DISCOVERED</p>';
+            }
+        }
+
+        async function updateLotData() {
+            const data = await API.getLotStatus(lot_id);
+            // Check for occupancy changes to trigger alerts
+            data.spots.forEach(s => {
+                const wasOcc = lastOccupiedStates[s.spot_id];
+                if (s.occupied && !wasOcc) {
+                    // Spot just taken
+                    if (isGuidanceActive && s.spot_id === recommendedId) {
+                        playAlertSound();
+                        triggerHaptic();
+                        showRerouteAlert();
+                    }
+                }
+                lastOccupiedStates[s.spot_id] = s.occupied;
+            });
+
+            updateUI(data);
+            updateRetrievalUI();
+        }
+
+        function saveParkedLocation() {
+            if (!recommendedId) {
+                alert("Please select or arrive at a spot first.");
+                return;
+            }
+            parkedSpotId = recommendedId;
+            localStorage.setItem('parked_spot_id', parkedSpotId);
+            updateRetrievalUI();
+            alert(`Location Locked: Spot ${parkedSpotId}. We'll guide you back later!`);
+        }
+
+        async function startRetrieval() {
+            if (!parkedSpotId) return;
+            navMode = 'retrieval';
+            recommendedId = parseInt(parkedSpotId);
+            
+            // Route from Spot to Entrance (Node 0)
+            // findShortestPath(startNode, targetNode)
+            // But for finding the car, the driver is AT the entrance (Node 0) going TO the spot.
+            // Or if returning, they are AT the spot going TO Node 0.
+            // User requirement: "routing drivers back from the Spot to the Main Entrance"
+            
+            navRoute = findReversePath(recommendedId, 0); 
+            if (navRoute) {
+                isGuidanceActive = true;
+                navProgress = 0;
+                document.getElementById('start-nav').style.display = 'none';
+                document.getElementById('end-nav').style.display = 'block';
+                document.getElementById('nav-badge').innerText = "RETRIEVAL ACTIVE";
+                document.getElementById('nav-badge').style.color = "#eab308";
+                document.getElementById('rec-panel').style.borderColor = "#eab308";
+                updateRecPanel(recommendedId, "Routing back to Terminal Entrance");
+            }
+        }
+
+        function findReversePath(fromSpotId, toNodeIdx) {
+            // Find node closest to spot
+            const spot = mapping.spots.find(s => s.spot_id === fromSpotId);
+            if (!spot) return null;
+            const spx = (spot.poly.reduce((a,b)=>a+b[0],0)/4) + spot.zone_offset.x/1000;
+            const spy = (spot.poly.reduce((a,b)=>a+b[1],0)/4) + spot.zone_offset.y/1000;
+            
+            let spotNodeIdx = 0;
+            let minDist = Infinity;
+            mapping.nodes.forEach((n, idx) => {
+                const d = Math.hypot(n.x - spx, n.y - spy);
+                if (d < minDist) { minDist = d; spotNodeIdx = idx; }
+            });
+
+            return findShortestPathBetweenNodes(spotNodeIdx, toNodeIdx);
+        }
+
+        function findShortestPathBetweenNodes(startIdx, targetIdx) {
+            const n = mapping.nodes.length;
+            const dists = new Array(n).fill(Infinity);
+            const prev = new Array(n).fill(null);
+            dists[startIdx] = 0;
+            const queue = [startIdx];
+
+            while (queue.length > 0) {
+                const u = queue.shift();
+                if (u === targetIdx) break;
+                const activeEdges = mapping.edges.filter(e => e[0] === u || e[1] === u);
+                for(let e of activeEdges) {
+                    const v = (e[0] === u ? e[1] : e[0]);
+                    const weight = e[2] || Math.hypot(mapping.nodes[u].x - mapping.nodes[v].x, mapping.nodes[u].y - mapping.nodes[v].y);
+                    if (dists[u] + weight < dists[v]) { dists[v] = dists[u] + weight; prev[v] = u; queue.push(v); }
+                }
+            }
+            const path = [];
+            let curr = targetIdx;
+            while (curr !== null) { path.push(curr); curr = prev[curr]; }
+            return path.length > 1 ? path.reverse() : null;
+        }
+
+        function populateZoneSwitcher(data) {
+            const select = document.getElementById('zone-select');
+            const container = document.getElementById('zone-switcher-container');
+            const zoneIds = [...new Set(data.nodes.map(n => n.zone_id))];
+            
+            if (zoneIds.length > 1) {
+                container.style.display = 'block';
+                // Only add if not already there
+                if (select.options.length === 1) {
+                    zoneIds.forEach((zid, idx) => {
+                        const opt = document.createElement('option');
+                        opt.value = zid;
+                        opt.innerText = `Camera Zone ${idx + 1}`;
+                        select.appendChild(opt);
+                    });
+                }
+            }
+        }
+
+        function switchZoneView() {
+            viewMode = document.getElementById('zone-select').value;
+            drawBlueprint();
+        }
+
+        boot();
+
+        function updateUI(data) {
+            mapping = data;
+            currentSpots = data.spots || [];
+            populateZoneSwitcher(data);
+
+            const available = currentSpots.filter(s => !s.occupied);
+            document.getElementById('avail-hero').innerText = available.length;
+
+            if (available.length > 0) {
+                if (isGuidanceActive && recommendedId) {
+                    const spot = currentSpots.find(s => s.spot_id === recommendedId);
+                    if (spot && spot.occupied) {
+                        showRerouteAlert();
+                        triggerRec();
+                    }
+                } else if (!recommendedId) {
+                    triggerRec();
+                }
+            }
+            drawBlueprint();
+        }
+
+        async function triggerRec() {
+            const res = await API.getLotRecommendation(lot_id);
+            if (res.status === 'success') {
+                recommendedId = res.recommended_spot_id;
+                updateRecPanel(recommendedId, "Proximity optimized to main entrance");
+                if (isGuidanceActive) {
+                    navRoute = findShortestPath(0, recommendedId); // Logic below
+                }
+            }
+        }
+
+        function updateRecPanel(id, reason) {
+            document.getElementById('rec-id').innerText = `Spot ${id}`;
+            document.getElementById('rec-reason').innerText = reason;
+        }
+
+        canvas.onclick = (e) => {
+            if (!mapping || !mapping.spots) return;
+            const rect = canvas.getBoundingClientRect();
+            const clickX = (e.clientX - rect.left - offset.x) / lotScale;
+            const clickY = (e.clientY - rect.top - offset.y) / lotScale;
+
+            mapping.spots.forEach((s) => {
+                // Adjust poly to global normalized coords for hit testing
+                const globalPoly = s.poly.map(p => [p[0] + s.zone_offset.x/1000, p[1] + s.zone_offset.y/1000]);
+                if (isInside([clickX, clickY], globalPoly)) {
+                    if (s.occupied) {
+                        showOccupiedAlert();
+                    } else {
+                        recommendedId = s.spot_id;
+                        if (isGuidanceActive) {
+                            navRoute = findShortestPath(0, recommendedId);
+                        }
+                        updateRecPanel(s.spot_id, "Manual override priority");
+                    }
+                }
+            });
+            drawBlueprint();
+        };
+
+        function isInside(point, vs) {
+            let x = point[0], y = point[1];
+            let inside = false;
+            for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+                let xi = vs[i][0], yi = vs[i][1];
+                let xj = vs[j][0], yj = vs[j][1];
+                let intersect = ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        }
+
+        function showOccupiedAlert() {
+            alertBox.innerText = "⚠️ SPACE OCCUPIED - PLEASE SELECT AN EMPTY SLOT";
+            alertBox.style.display = 'block';
+            setTimeout(() => alertBox.style.display = 'none', 3000);
+        }
+
+        function showRerouteAlert() {
+            alertBox.innerText = "⚠️ TARGET OCCUPIED! REROUTING TO NEAREST EMPTY... 🔄";
+            alertBox.style.display = 'block';
+            setTimeout(() => alertBox.style.display = 'none', 3000);
+        }
+
+        function findShortestPath(startNodeIdx, targetSpotId) {
+            if (!mapping || !mapping.nodes || !mapping.edges) return null;
+            
+            const spot = mapping.spots.find(s => s.spot_id === targetSpotId);
+            if (!spot) return null;
+            const spx = (spot.poly.reduce((a,b)=>a+b[0],0)/4) + spot.zone_offset.x/1000;
+            const spy = (spot.poly.reduce((a,b)=>a+b[1],0)/4) + spot.zone_offset.y/1000;
+            
+            let targetNodeIdx = 0;
+            let minDist = Infinity;
+            mapping.nodes.forEach((n, idx) => {
+                const d = Math.hypot(n.x - spx, n.y - spy);
+                if (d < minDist) { minDist = d; targetNodeIdx = idx; }
+            });
+
+            return findShortestPathBetweenNodes(startNodeIdx, targetNodeIdx);
+        }
+
+        function drawBlueprint() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (!mapping) return;
+
+            // Global Scaling vs Local Zone Scaling
+            let nodesToDraw = mapping.nodes;
+            let spotsToDraw = mapping.spots;
+            let edgesToDraw = mapping.edges;
+
+            if (viewMode !== 'global') {
+                const vid = parseInt(viewMode);
+                nodesToDraw = mapping.nodes.filter(n => n.zone_id === vid);
+                spotsToDraw = mapping.spots.filter(s => s.zone_id === vid); 
+            }
+
+            // Let's simplify: for local view, find bounding box of nodes in that zone
+            let targetNodes = (viewMode === 'global') ? mapping.nodes : mapping.nodes.filter(n => n.zone_id == viewMode);
+
+            let minX = Math.min(...targetNodes.map(n => n.x));
+            let maxX = Math.max(...targetNodes.map(n => n.x));
+            let minY = Math.min(...targetNodes.map(n => n.y));
+            let maxY = Math.max(...targetNodes.map(n => n.y));
+            
+            const worldW = (maxX - minX) || 1;
+            const worldH = (maxY - minY) || 1;
+            const padding = 0.2;
+            lotScale = Math.min(canvas.width / (worldW * (1+padding)), canvas.height / (worldH * (1+padding)));
+            offset.x = (canvas.width - worldW * lotScale) / 2 - minX * lotScale;
+            offset.y = (canvas.height - worldH * lotScale) / 2 - minY * lotScale;
+
+            const toCanvas = (px, py) => [offset.x + px * lotScale, offset.y + py * lotScale];
+
+            // A. High-Tech Lanes
+            ctx.strokeStyle = "rgba(148, 163, 184, 0.15)";
+            ctx.lineWidth = (viewMode === 'global') ? 15 : 30;
+            ctx.lineCap = "round";
+            mapping.edges.forEach(e => {
+                const n1 = mapping.nodes[e[0]];
+                const n2 = mapping.nodes[e[1]];
+                if (viewMode !== 'global' && n1.zone_id != viewMode && n2.zone_id != viewMode) return;
+                const p1 = toCanvas(n1.x, n1.y);
+                const p2 = toCanvas(n2.x, n2.y);
+                ctx.beginPath(); ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.stroke();
+            });
+
+            // B. Slots
+            spotsToDraw.forEach((s) => {
+                const isOcc = s.occupied;
+                const isReserved = s.status === 'reserved';
+                const matchesTarget = s.spot_id === recommendedId;
+                const pts = s.poly.map(p => toCanvas(p[0] + s.zone_offset.x/1000, p[1] + s.zone_offset.y/1000));
+
+                ctx.fillStyle = "#0f172a";
+                ctx.strokeStyle = isReserved ? "#eab308" : "rgba(148, 163, 184, 0.4)";
+                ctx.lineWidth = isReserved ? 3 : 2;
+
+                ctx.beginPath();
+                ctx.moveTo(pts[0][0], pts[0][1]);
+                pts.slice(1).forEach(p => ctx.lineTo(p[0], p[1]));
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                if (isOcc) {
+                    drawStaticCar(pts);
+                } else if (isReserved) {
+                    ctx.fillStyle = "rgba(234, 179, 8, 0.1)"; ctx.fill();
+                    ctx.fillStyle = "#eab308"; ctx.font = "bold 9px Inter"; ctx.textAlign = "center";
+                    const cx = pts.reduce((a, b) => a + b[0], 0) / 4;
+                    const cy = pts.reduce((a, b) => a + b[1], 0) / 4;
+                    ctx.fillText("RESERVED", cx, cy + 4);
+                } else if (matchesTarget) {
+                    ctx.fillStyle = "rgba(0, 243, 255, 0.1)"; ctx.fill();
+                    ctx.shadowBlur = 10; ctx.shadowColor = "var(--neon-blue)";
+                    ctx.strokeStyle = "var(--neon-blue)"; ctx.stroke(); ctx.shadowBlur = 0;
+                    const cx = pts.reduce((a, b) => a + b[0], 0) / 4;
+                    const cy = pts.reduce((a, b) => a + b[1], 0) / 4;
+                    drawPin(cx, cy);
+                } else {
+                    ctx.fillStyle = "rgba(148, 163, 184, 0.5)";
+                    ctx.font = "bold 10px Inter"; ctx.textAlign = "center";
+                    const cx = pts.reduce((a, b) => a + b[0], 0) / 4;
+                    const cy = pts.reduce((a, b) => a + b[1], 0) / 4;
+                    ctx.fillText(`${s.spot_index+1}`, cx, cy + 4);
+                }
+            });
+
+            // C. Entrance Marker
+            if (mapping.nodes.length > 0) {
+                const entryNode = mapping.nodes[0];
+                const entry = toCanvas(entryNode.x, entryNode.y);
+                drawEntrance(entry[0], entry[1]);
+            }
+
+            // D. guidance Route
+            if (isGuidanceActive && navRoute && navRoute.length > 1) {
+                ctx.strokeStyle = "var(--neon-blue)";
+                ctx.lineWidth = 8;
+                ctx.lineCap = "round";
+                ctx.shadowBlur = 15; ctx.shadowColor = "var(--neon-blue)";
+                ctx.beginPath();
+                const startNode = mapping.nodes[navRoute[0]];
+                const s = toCanvas(startNode.x, startNode.y);
+                ctx.moveTo(s[0], s[1]);
+                for (let i = 1; i < navRoute.length; i++) {
+                    const node = mapping.nodes[navRoute[i]];
+                    const p = toCanvas(node.x, node.y);
+                    ctx.lineTo(p[0], p[1]);
+                }
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+
+                navProgress = (navProgress + 0.003) % 1;
+                const segs = navRoute.length - 1;
+                const segIdx = Math.floor(navProgress * segs);
+                const t = (navProgress * segs) % 1;
+                const node1 = mapping.nodes[navRoute[segIdx]];
+                const node2 = mapping.nodes[navRoute[segIdx + 1]];
+                const p1 = toCanvas(node1.x, node1.y);
+                const p2 = toCanvas(node2.x, node2.y);
+                const dx = p1[0] + (p2[0] - p1[0]) * t;
+                const dy = p1[1] + (p2[1] - p1[1]) * t;
+                const angle = Math.atan2(p2[1] - p1[1], p2[0] - p1[0]);
+
+                drawLiveCar(dx, dy, angle);
+                requestAnimationFrame(drawBlueprint);
+            }
+        }
+
+        function drawEntrance(x, y) {
+            ctx.fillStyle = "rgba(0, 243, 255, 0.3)";
+            ctx.beginPath(); ctx.arc(x, y, 12, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "var(--neon-blue)";
+            ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();
+        }
+
+        function drawPin(x, y) {
+            ctx.save();
+            ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
+            ctx.beginPath(); ctx.ellipse(x, y + 4, 10, 4, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "#ef4444";
+            ctx.beginPath(); ctx.moveTo(x, y);
+            ctx.bezierCurveTo(x - 10, y - 4, x - 12, y - 12, x - 12, y - 18);
+            ctx.arc(x, y - 18, 12, Math.PI, 0, false);
+            ctx.bezierCurveTo(x + 12, y - 12, x + 10, y - 4, x, y);
+            ctx.fill();
+            ctx.fillStyle = "#b91c1c";
+            ctx.beginPath(); ctx.arc(x, y - 18, 5, 0, Math.PI * 2); ctx.fill();
+            ctx.restore();
+        }
+
+        function drawStaticCar(pts) {
+            const cx = pts.reduce((a, b) => a + b[0], 0) / 4;
+            const cy = pts.reduce((a, b) => a + b[1], 0) / 4;
+            const angle = Math.atan2(pts[1][1] - pts[0][1], pts[1][0] - pts[0][0]);
+            ctx.save();
+            ctx.translate(cx, cy); ctx.rotate(angle);
+            ctx.fillStyle = "#334155";
+            ctx.beginPath(); ctx.roundRect(-10, -6, 20, 12, 3); ctx.fill();
+            ctx.restore();
+        }
+
+        function drawLiveCar(x, y, angle) {
+            ctx.save();
+            ctx.translate(x, y); ctx.rotate(angle);
+            ctx.shadowBlur = 10; ctx.shadowColor = "#fff";
+            ctx.fillStyle = "#f8fafc";
+            ctx.beginPath(); ctx.roundRect(-12, -7, 24, 14, 4); ctx.fill();
+            ctx.fillStyle = "#0f172a"; ctx.fillRect(6, -6, 3, 12);
+            ctx.restore();
+        }
+
+        function requestNavigation() {
+            if (!recommendedId || !mapping) return;
+            navMode = 'parking';
+            navRoute = findShortestPath(0, recommendedId);
+            if (!navRoute) {
+                alert("PATH ERROR: Entrance not reachable. Check Architect connections.");
+            } else {
+                isGuidanceActive = true; navProgress = 0;
+                document.getElementById('start-nav').style.display = 'none';
+                document.getElementById('end-nav').style.display = 'block';
+                document.getElementById('nav-badge').innerText = "GUIDANCE ACTIVE";
+                document.getElementById('nav-badge').style.color = "var(--neon-green)";
+                document.getElementById('rec-panel').style.borderColor = "var(--neon-green)";
+            }
+        }
+
+        function stopNavigation() {
+            isGuidanceActive = false; navRoute = null;
+            navMode = 'parking';
+            document.getElementById('start-nav').style.display = 'block';
+            document.getElementById('end-nav').style.display = 'none';
+            document.getElementById('nav-badge').innerText = "TARGETING NEAREST";
+            document.getElementById('nav-badge').style.color = "var(--neon-blue)";
+            document.getElementById('rec-panel').style.borderColor = "rgba(148, 163, 184, 0.2)";
+            drawBlueprint();
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+PyJWT
+bcrypt
+opencv-python
+numpy
+ultralytics
+shapely
+python-multipart

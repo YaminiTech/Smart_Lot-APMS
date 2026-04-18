@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMART LOT | Admin Console</title>
+    <link rel="stylesheet" href="/css/global.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        .admin-layout {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            height: 100vh;
+        }
+
+        .sidebar {
+            background: #020617;
+            border-right: 1px solid var(--border-muted);
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2.5rem;
+        }
+
+        .main-panel {
+            padding: 3rem;
+            overflow-y: auto;
+            background: radial-gradient(circle at 0% 0%, #0f172a 0%, #020617 100%);
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            color: var(--text-secondary);
+            padding: 12px 20px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: 0.2s;
+            font-weight: 500;
+        }
+
+        .nav-item:hover,
+        .nav-item.active {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--accent-blue);
+        }
+
+        .tab-content {
+            display: none;
+            animation: slide-up 0.4s ease-out;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .video-monitor {
+            aspect-ratio: 16/9;
+            background: #000;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 2px solid var(--border-muted);
+            position: relative;
+        }
+
+        .monitor-feed {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .help-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-muted);
+            padding: 1.5rem;
+            border-radius: 16px;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- WORKSPACE SELECTION MODAL -->
+    <div id="lot-selection-overlay" style="position: fixed; inset: 0; background: rgba(2,6,23,0.95); z-index: 1000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(10px);">
+        <div class="cyber-card" style="width: 100%; max-width: 600px; padding: 3rem;">
+            <h2 class="neon-text-blue" style="margin-bottom: 2rem;">Workspace Selection</h2>
+            
+            <div style="margin-bottom: 2rem;">
+                <label class="nav-label">Load Existing Parking Lot</label>
+                <select id="existing-lots-select" class="cyber-input" style="width: 100%; background: rgba(0,0,0,0.5); padding: 12px; margin-bottom: 1rem; color: white;">
+                    <option value="">Fetching...</option>
+                </select>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-cyber" onclick="loadSelectedLot()" style="flex: 2;">Enter Workspace</button>
+                    <button class="btn-cyber btn-secondary" onclick="resetSelectedLot()" style="flex: 1; border-color: var(--neon-red); color: var(--neon-red);">Reset Data</button>
+                    <button class="btn-cyber btn-secondary" style="background: rgba(255,0,0,0.1); border-color: var(--neon-red); color: var(--neon-red);" onclick="deleteSelectedLot()">Delete Lot</button>
+                </div>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid var(--border-muted); margin: 2rem 0;">
+
+            <h3 style="margin-bottom: 1rem;">Create New Structure</h3>
+            <input type="text" id="new-lot-name" placeholder="Lot Name (e.g. Metropolis Mall)" class="cyber-input" style="width: 100%; padding: 12px; margin-bottom: 1rem; background: rgba(0,0,0,0.5); color: white;">
+            <select id="new-lot-type" class="cyber-input" style="width: 100%; padding: 12px; margin-bottom: 1rem; background: rgba(0,0,0,0.5); color: white;">
+                <option value="single">Single Zone (1 Camera Source)</option>
+                <option value="multi">Multi Zone (Multiple Stitchable Cameras)</option>
+            </select>
+            <button class="btn-cyber btn-secondary" onclick="createNewLot()" style="width: 100%;">Initialize Architecture</button>
+        </div>
+    </div>
+
+    <div class="admin-layout">
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div style="font-weight: 900; font-size: 1.2rem; letter-spacing: 1px;" class="neon-text-blue">ADMIN PANEL
+            </div>
+
+            <a href="/"
+                style="text-decoration: none; color: var(--text-dim); font-size: 0.7rem; display: flex; align-items: center; gap: 5px; margin: -10px 0 10px 0;">
+                <span>←</span> BACK TO HOME
+            </a>
+
+            <nav style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <div class="nav-item active" onclick="switchTab('dashboard')">📊 Dashboard</div>
+                <div class="nav-item" onclick="switchTab('cameras')">📹 Cameras</div>
+                <div class="nav-item" onclick="switchTab('settings')">⚙️ Settings & Map</div>
+                <div class="nav-item" onclick="switchTab('help')">❓ Help Center</div>
+            </nav>
+
+            <div style="margin-top: auto; padding-top: 2rem; border-top: 1px solid var(--border-muted);">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--accent-blue);"></div>
+                    <div>
+                        <div style="font-size: 0.85rem; font-weight: 700;">Superuser</div>
+                        <a href="/" style="font-size: 0.7rem; color: var(--text-dim); text-decoration: none;">Sign
+                            Out</a>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- MAIN PANEL -->
+        <main class="main-panel">
+
+            <!-- 1. DASHBOARD Tab -->
+            <div id="tab-dashboard" class="tab-content active">
+                <div class="header" style="margin-bottom: 2rem;">
+                    <h1>Live Fleet Telemetry</h1>
+                    <p style="color: var(--text-secondary);">Real-time AI detection filtering and occupancy analysis.
+                    </p>
+                </div>
+
+                <div class="video-monitor" style="margin-bottom: 2rem;">
+                    <img src="/ai_feed" class="monitor-feed" id="admin-ai-feed">
+                    <div id="live-indicator"
+                        style="position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.6); padding: 5px 15px; border-radius: 20px; font-size: 0.75rem; font-weight: 800; color: #666; display: flex; align-items: center; gap: 8px;">
+                        <span id="live-dot"
+                            style="width: 8px; height: 8px; border-radius: 50%; background: #444;"></span>
+                        <span id="live-label">SIGNAL: IDLE</span>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem;">
+                    <div class="cyber-card">
+                        <span class="nav-label">Total Nodes</span>
+                        <h2 id="total-slots">--</h2>
+                    </div>
+                    <div class="cyber-card">
+                        <span class="nav-label">Available</span>
+                        <h2 id="free-slots" class="neon-text-green">--</h2>
+                    </div>
+                    <div class="cyber-card">
+                        <span class="nav-label">Occupied</span>
+                        <h2 id="occupied-slots" class="neon-text-red">--</h2>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. CAMERAS Tab -->
+            <div id="tab-cameras" class="tab-content">
+                <h1>Workspace Camera Matrix</h1>
+                <div id="camera-library-header"
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                    <p style="color: var(--text-secondary); margin: 0;">Overview of all cameras actively assigned to this Lot.</p>
+                    <button class="btn-cyber" style="background: rgba(0, 243, 255, 0.1); border-color: var(--neon-blue);"
+                        onclick="if(currentLotId) window.location.href='/stitcher?lot_id=' + currentLotId">🗺️ Launch Global Stitcher</button>
+                </div>
+                <div id="camera-list"
+                    style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem;">
+                    <!-- JS Injected Videos -->
+                </div>
+            </div>
+
+            <!-- 3. SETTINGS & MAP Tab -->
+            <div id="tab-settings" class="tab-content">
+                <div class="header"
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                    <div>
+                        <h1>Calibration & Setup</h1>
+                        <p style="color: var(--text-secondary);">Add new video sources and define your parking polymers.
+                        </p>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button id="upgrade-multi-btn" class="btn-cyber btn-secondary" style="border-color: var(--neon-green); color: var(--neon-green); display: none;" onclick="upgradeLotType()">⬆️ Upgrade to Multi-Zone</button>
+                        <button class="btn-cyber btn-secondary" style="border-color: var(--neon-blue); color: var(--neon-blue);" onclick="document.getElementById('lot-selection-overlay').style.display = 'flex'; checkLotWorkspace();">🏢 Change Workspace Lot</button>
+                        <button class="btn-cyber btn-secondary" onclick="addUrlStream()">+ Add URL Stream</button>
+                        <button class="btn-cyber" onclick="document.getElementById('video-upload').click()">+ Upload Video</button>
+                    </div>
+                    <input type="file" id="video-upload" style="display: none;" onchange="handleNewUpload()">
+                </div>
+
+                <div class="cyber-card"
+                    style="text-align: center; padding: 4rem; border: 2px dashed var(--border-muted);">
+                    <h3>Map Architect Integration</h3>
+                    <p style="color: var(--text-dim); margin-bottom: 2rem;">Upload a video or select an existing one to
+                        launch the drawing tool.</p>
+                </div>
+            </div>
+
+            <!-- 4. HELP Tab -->
+            <div id="tab-help" class="tab-content">
+                <h1>Admin Help Center</h1>
+                <p style="color: var(--text-secondary); margin-bottom: 2rem;">Addressing common confusions during setup
+                    and management.</p>
+
+                <div class="help-card"
+                    style="border-left: 2px solid var(--neon-blue); background: rgba(0, 243, 255, 0.03);">
+                    <h4 class="neon-text-blue">Architect Pro: Master Mapping Guide</h4>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 10px; line-height: 1.6;">
+                        Mapping is the core of the intelligent system. Follow these precision controls:
+                    </p>
+                    <ul style="font-size: 0.8rem; color: var(--text-dim); margin-top: 10px; line-height: 1.8;">
+                        <li><b>SPOTS:</b> Click 4 corners (top-left, top-right, bottom-right, bottom-left) to define an
+                            occupancy polymer.</li>
+                        <li><b>NODES:</b> Click once to place an anchor point. Use these for <b>Entrances (Node 0)</b>,
+                            turns, and intersections.</li>
+                        <li><b>PATHS:</b> In Path mode, click a Start Node then an End Node to connect them. Connections
+                            are blue lanes.</li>
+                        <li><b>END PATH:</b> Use the 'End Current Path' button (sub-mode in Paths) or <b>Right-Click</b>
+                            to break a chain and start a new lane.</li>
+                        <li><b>UNDO / CLEAR:</b> Use 'Undo' to step back one point, or 'Wipe Mesh' to start the entire
+                            layout from scratch.</li>
+                    </ul>
+                </div>
+
+                <div class="help-card">
+                    <h4 class="neon-text-blue">"Why is the AI detecting areas I didn't map?"</h4>
+                    <p style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 8px;">The AI model scans the
+                        whole frame but filters results based on your <b>Polymers</b>. Ensure your polygons are tight
+                        around the actual spot boundaries.</p>
+                </div>
+                <div class="help-card">
+                    <h4 class="neon-text-blue">"How do I calibrate for different camera angles?"</h4>
+                    <p style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 8px;">Use the <b>Map
+                            Architect</b> in Settings. Points should be mapped from a high angle (birds-eye) for maximum
+                        accuracy.</p>
+                </div>
+                <div class="help-card">
+                    <h4 class="neon-text-blue">"The video source says 'Standby'—how do I go live?"</h4>
+                    <p style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 8px;">Go to the
+                        <b>Cameras</b> tab and click 'Activate' on the source you want to broadcast to the system.
+                    </p>
+                </div>
+
+                <!-- FRESH START UTILITY -->
+                <div class="help-card" style="border-color: #900; background: rgba(153,0,0,0.05);">
+                    <h4 style="color: #ff4d4d;">Nuclear Reset</h4>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin: 10px 0;">Delete all uploaded
+                        videos and wipe every saved map configuration. Use this if you want a 100% fresh pilot seat.</p>
+                    <button class="btn-cyber" style="background: #900;" onclick="purgeWorkspace()">Wipe Workspace &
+                        Restart</button>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script src="/js/core.js"></script>
+    <script>
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.getElementById(`tab-${id}`).classList.add('active');
+            event.currentTarget.classList.add('active');
+
+            if (id === 'cameras') loadLibrary();
+        }
+
+        async function purgeWorkspace() {
+            if (confirm("DANGER: This will delete ALL videos and maps for a 100% Fresh Start. Proceed?")) {
+                const res = await API.clearLibrary();
+                if (res.status === 'success') {
+                    alert("Workspace Purged. You are now starting with a clean slate.");
+                    location.reload();
+                }
+            }
+        }
+
+        async function addUrlStream() {
+            const url = prompt("Enter Video Stream URL (YouTube, RTSP, etc.):");
+            if (url) {
+                const res = await API.addUrl(url);
+                if (res.status === 'success') {
+                    await API.addZoneToLot(currentLotId, url);
+                    loadLibrary();
+                    alert("Camera Stream registered to Workspace!");
+                }
+            }
+        }
+
+        async function handleNewUpload() {
+            const fileInput = document.getElementById('video-upload');
+            if (!fileInput.files[0]) return;
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            const btn = document.querySelector('#tab-settings .btn-cyber');
+            const originalText = btn.innerText;
+            btn.innerText = "INGESTING...";
+            btn.disabled = true;
+
+            try {
+                const res = await API.uploadVideo(formData);
+                if (res.status === 'success') {
+                    await API.addZoneToLot(currentLotId, res.filename);
+                    loadLibrary();
+                    alert("Video registered to Workspace!");
+                }
+            } catch (e) {
+                alert("Upload failed. Ensure the server is running.");
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        async function loadLibrary() {
+            if (!currentLotId) return;
+            const data = await API.getZonesForLot(currentLotId);
+            const zones = data.zones || [];
+
+            // 1. Update Camera Tab List
+            const cameraContainer = document.getElementById('camera-list');
+            if (cameraContainer) {
+                cameraContainer.innerHTML = zones.map(v => `
+                    <div class="cyber-card" style="border-left: 4px solid var(--border-muted); padding: 0; overflow: hidden;">
+                        <div style="height: 120px; background: #000; display: flex; align-items: center; justify-content: center; position: relative;">
+                            <img src="/api/get_frame?filename=${v.filename}" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.6;">
+                        </div>
+                        <div style="padding: 1rem;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                <h3 style="font-size:0.9rem; margin:0;">${v.filename}</h3>
+                            </div>
+                            <p style="font-size: 0.7rem; color: var(--text-dim); margin: 5px 0 15px 0;">${v.has_config ? "✅ Mapped & Ready" : "⚠️ Needs Mapping"}</p>
+                            <div style="display: flex; gap: 10px;">
+                                <button class="btn-cyber" style="flex: 1; padding: 8px; font-size: 0.7rem;" onclick="API.switchVideo('${v.filename}').then(() => location.reload())">Preview Feed</button>
+                                <button class="btn-cyber btn-secondary" style="padding: 8px; font-size: 0.7rem;" onclick="openArchitect(${v.zone_id})">${v.has_config ? '🛠️ Remap' : '✨ Map Camera'}</button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('') || '<p style="grid-column: 1/-1; text-align:center; padding:2rem; color:var(--text-dim);">No cameras defined in this Workspace. Go to Settings to upload.</p>';
+            }
+
+            // 2. Update Settings Tab List (Mini Gallery)
+            const settingsGallery = document.querySelector('#tab-settings .cyber-card');
+            if (settingsGallery && zones.length > 0) {
+                settingsGallery.innerHTML = `
+                    <h3 style="margin-bottom:1.5rem;">Select Source to Map</h3>
+                    <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:1rem;">
+                        ${zones.map(v => `
+                            <div class="cyber-card" style="padding:0.8rem;">
+                                <div style="font-weight:700; font-size:0.85rem; margin-bottom:10px;">${v.filename}</div>
+                                <div style="display: flex; flex-direction: column; gap: 8px;">
+                                    <button class="btn-cyber" style="width: 100%; font-size: 0.7rem; padding: 6px;" onclick="openArchitect(${v.zone_id})">
+                                        ${v.has_config ? '🛠️ Edit Mapping' : '✨ Start Mapping'}
+                                    </button>
+                                    ${v.has_config ? `<button class="btn-cyber btn-secondary" style="width: 100%; font-size: 0.65rem; padding: 5px;" onclick="resetMapping(${v.zone_id}, '${v.filename}')">🗑️ Reset Mesh</button>` : ''}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                 `;
+            }
+        }
+
+        async function resetMapping(zone_id, filename) {
+            if (confirm(`Are you sure you want to WIPE all mapping for ${filename}? This cannot be undone.`)) {
+                const res = await API.saveZoneMap(zone_id, { spots: [], nodes: [], edges: [] });
+                if (res.status === 'success') {
+                    alert("Mapping Reset. Refreshing dashboard...");
+                    loadLibrary();
+                }
+            }
+        }
+
+        let currentLotId = null;
+
+        async function checkLotWorkspace() {
+            try {
+                const data = await API.getLots();
+                const select = document.getElementById('existing-lots-select');
+                select.innerHTML = '';
+                
+                window.allLotsData = data.lots || [];
+
+                if (data.lots && data.lots.length > 0) {
+                    data.lots.forEach(lot => {
+                        const opt = document.createElement('option');
+                        opt.value = lot.id;
+                        opt.textContent = `${lot.name} (${lot.zone_type === 'single' ? 'Single ' : 'Multi-'}Zone)`;
+                        select.appendChild(opt);
+                    });
+                } else {
+                    select.innerHTML = '<option disabled selected>No existing lots found.</option>';
+                }
+            } catch(e) {
+                // Not authenticated
+                window.location.href = '/login';
+            }
+        }
+
+        function loadSelectedLot() {
+            const id = parseInt(document.getElementById('existing-lots-select').value);
+            if (!id && document.getElementById('existing-lots-select').options[0].disabled) return;
+            currentLotId = id;
+
+            const myLot = window.allLotsData.find(l => l.id === id);
+            const upgradeBtn = document.getElementById('upgrade-multi-btn');
+            if (upgradeBtn) {
+                if (myLot && myLot.zone_type === 'single') upgradeBtn.style.display = 'inline-block';
+                else upgradeBtn.style.display = 'none';
+            }
+
+            document.getElementById('lot-selection-overlay').style.display = 'none';
+            loadLibrary();
+        }
+
+        async function deleteSelectedLot() {
+            const id = document.getElementById('existing-lots-select').value;
+            if (!id || document.getElementById('existing-lots-select').options[0].disabled) return;
+            if (confirm("CRITICAL WARNING: Are you sure you want to completely ANNIHILATE this Lot and all associated cameras/zones? This cannot be undone.")) {
+                try {
+                    const res = await API.deleteLot(id);
+                    if (res.status === 'success') {
+                        checkLotWorkspace();
+                        document.getElementById('lot-selection-overlay').style.display = 'none';
+                    } else alert("Failed to delete.");
+                } catch(e) { console.error(e); }
+            }
+        }
+
+        async function resetSelectedLot() {
+            const id = document.getElementById('existing-lots-select').value;
+            if (!id || document.getElementById('existing-lots-select').options[0].disabled) return;
+            if (confirm("WARNING: Wipe all spots, nodes, and mapped polygons in this Lot? The Lot entity itself will remain intact for re-mapping.")) {
+                try {
+                    const res = await API.resetLot(id);
+                    if (res.status === 'success') alert("Workspace successfully reset!");
+                    else alert("Failed to reset.");
+                } catch(e) { console.error(e); }
+            }
+        }
+
+        async function upgradeLotType() {
+            if (confirm("UPGRADE WORKSPACE: Convert this Single-Zone Lot into a Multi-Zone Matrix? This unlocks Grid Stitching and limitless cameras. This cannot be undone.")) {
+                const res = await API.updateLotType(currentLotId, 'multi');
+                if (res.status === 'success') {
+                    alert("Workspace Upgraded to Multi-Zone successfully!");
+                    checkLotWorkspace().then(loadSelectedLot);
+                } else alert("Failed to upgrade.");
+            }
+        }
+
+        async function createNewLot() {
+            const name = document.getElementById('new-lot-name').value;
+            const type = document.getElementById('new-lot-type').value;
+            if (!name) return alert("Enter a lot name.");
+            
+            try {
+                const res = await API.createLot(name, type);
+                if (res.status === 'success') {
+                    currentLotId = res.lot_id;
+                    document.getElementById('lot-selection-overlay').style.display = 'none';
+                    checkLotWorkspace(); // Refresh list secretly in background
+                    loadLibrary();
+                } else {
+                    alert("Failed to create lot.");
+                }
+            } catch(e) { alert("Authorization Error."); }
+        }
+
+        function openArchitect(zone_id) {
+            window.location.href = `/architect?zone_id=${zone_id}`;
+        }
+
+        window.onload = () => {
+            checkLotWorkspace();
+            if (sessionStorage.getItem('run_wizard') === 'true') {
+                sessionStorage.removeItem('run_wizard');
+                const settingsBtn = document.querySelector('.nav-item:nth-child(3)');
+                if (settingsBtn) settingsBtn.click();
+            }
+        };
+
+        runHeartbeat((data) => {
+            const occ = (data.spots || []).filter(s => s.occupied).length;
+            document.getElementById('total-slots').innerText = (data.spots || []).length;
+            document.getElementById('free-slots').innerText = (data.spots || []).length - occ;
+            document.getElementById('occupied-slots').innerText = occ;
+
+            // Update Live Indicator (Dialogue 4)
+            const dot = document.getElementById('live-dot');
+            const label = document.getElementById('live-label');
+            const indicator = document.getElementById('live-indicator');
+
+            if (data.active) {
+                if (data.is_live) {
+                    dot.style.background = "var(--neon-red)";
+                    dot.classList.add('active'); // Will use global pulse animation
+                    label.innerText = "LIVE STREAM: ACTIVE";
+                    indicator.style.color = "var(--neon-red)";
+                } else {
+                    dot.style.background = "#64748b";
+                    dot.classList.remove('active');
+                    label.innerText = "HISTORICAL DATA: " + data.active;
+                    indicator.style.color = "#94a3b8";
+                }
+            } else {
+                dot.style.background = "#333";
+                label.innerText = "SIGNAL: STANDBY";
+                indicator.style.color = "var(--text-dim)";
+            }
+        });
+    </script>
+</body>
+
+</html>
