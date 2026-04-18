@@ -138,4 +138,4 @@ Full technical walkthroughs and deep-dive methodology reports are archived in th
 
 ---
 
-*Prepared for Paper Presentation 2026 — SmartPark: Making ogni camera a smart parking sensor.*
+*Prepared for Paper Presentation 2026 — SmartLot: APMS.*
